@@ -1,0 +1,19 @@
+name = "my-shop"
+main = "src/worker.js"
+compatibility_date = "2025-09-01"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "shop-db"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "shop-media"
+
+[vars]
+DELIVERY_FEE = "100"
+BKASH_NUMBER = "01XXXXXXXXX"

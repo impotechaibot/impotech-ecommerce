@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="bn"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>আমার দোকান</title>
+<link rel="manifest" href="/manifest.json"><link rel="icon" href="/icon-192.png"><meta name="theme-color" content="#0f766e">
+<style>
+:root{--bg:#fff;--fg:#1a1a1a;--mu:#666;--c:#0f766e;--card:#f3f4f3;--bd:#ddd;color-scheme:light dark}
+@media(prefers-color-scheme:dark){:root{--bg:#131515;--fg:#eee;--mu:#aaa;--card:#1d2020;--bd:#333}}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.55 system-ui,"Noto Sans Bengali","Hind Siliguri",sans-serif;background:var(--bg);color:var(--fg);padding-bottom:env(safe-area-inset-bottom)}
+header{display:flex;justify-content:space-between;align-items:center;padding:calc(12px + env(safe-area-inset-top)) 16px 12px;background:var(--c);color:#fff;position:sticky;top:0;z-index:5}
+header a{color:#fff;text-decoration:none;margin-left:16px}header .l{margin:0;font-weight:700}
+main{max-width:900px;margin:auto;padding:16px}
+.g{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.card{background:var(--card);border-radius:10px;overflow:hidden;color:inherit;text-decoration:none;display:block}
+.card img{width:100%;aspect-ratio:1;object-fit:cover;display:block}.card div{padding:8px 10px}
+img{max-width:100%;border-radius:10px}video{width:100%;border-radius:10px;background:#000}
+input,select,textarea,button{font:inherit;width:100%;padding:10px;margin:4px 0;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--fg)}
+button{background:var(--c);color:#fff;border:0;cursor:pointer}button:disabled{opacity:.6}
+button.s{width:auto;padding:4px 12px;background:var(--card);color:var(--fg);border:1px solid var(--bd)}
+.r{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bd)}.r select{width:auto}
+.m{color:var(--mu);font-size:14px}:focus-visible{outline:2px solid var(--c);outline-offset:2px}
+</style></head><body>
+<header><a class="l" href="#/">আমার দোকান</a><nav><a href="#/track">ট্র্যাক</a><a href="#/cart">কার্ট (<span id="cc">0</span>)</a></nav></header>
+<main id="app"></main>
+<script>
+const $=s=>document.querySelector(s),app=$('#app'),
+esc=s=>String(s??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';'),
+bn=n=>'৳'+Number(n).toLocaleString('bn-BD'),
+ST={pending:'অপেক্ষমাণ',confirmed:'নিশ্চিত',shipped:'পাঠানো হয়েছে',delivered:'পৌঁছেছে',cancelled:'বাতিল'},
+J=(u,o)=>fetch(u,o).then(r=>r.json());
+let P=[],CFG={delivery:0,bkash:''},cart={};
+try{cart=JSON.parse(localStorage.cart||'{}')}catch{}
+const save=()=>{try{localStorage.cart=JSON.stringify(cart)}catch{}$('#cc').textContent=Object.values(cart).reduce((a,b)=>a+b,0)};
+const load=async()=>{[P,CFG]=await Promise.all([J('/api/products'),J('/api/config')]);save()};
+const img=p=>p.image?`<img src="${esc(p.image)}" alt="${esc(p.name)}" loading="lazy">`:'';
+
+function home(){
+  app.innerHTML=`<h2>সব পণ্য</h2><div class="g">${P.map(p=>`<a class="card" href="#/p/${p.id}">${img(p)}<div>${esc(p.name)}<br><b>${bn(p.price)}</b>${p.video?' ▶ ভিডিও':''}</div></a>`).join('')||'<p class="m">এখনো কোনো পণ্য যোগ করা হয়নি।</p>'}</div>`;
+}
+function prod(id){
+  const p=P.find(x=>x.id===id);if(!p)return home();
+  app.innerHTML=`${p.video?`<video controls playsinline preload="metadata" poster="${esc(p.image)}" src="${esc(p.video)}"></video>`:img(p)}<h2>${esc(p.name)}</h2><h3>${bn(p.price)}</h3><p style="white-space:pre-line">${esc(p.description)}</p><button id="add">কার্টে যোগ করুন</button>`;
+  $('#add').onclick=()=>{cart[id]=(cart[id]||0)+1;save();location.hash='#/cart'};
+}
+function cartV(){
+  const L=Object.entries(cart).map(([id,q])=>({p:P.find(x=>x.id==id),q})).filter(l=>l.p),sub=L.reduce((a,l)=>a+l.p.price*l.q,0);
+  if(!L.length){app.innerHTML='<h2>কার্ট খালি</h2><p><a href="#/">পণ্য দেখুন</a></p>';return}
+  app.innerHTML=`<h2>কার্ট</h2>${L.map(l=>`<div class="r"><span>${esc(l.p.name)}<br><span class="m">${bn(l.p.price)}</span></span><span><button class="s" data-i="${l.p.id}" data-d="-1">−</button> ${l.q} <button class="s" data-i="${l.p.id}" data-d="1">+</button></span></div>`).join('')}
+<p>পণ্যের মূল্য: ${bn(sub)}<br>ডেলিভারি: ${bn(CFG.delivery)}<br><b>মোট: ${bn(sub+CFG.delivery)}</b></p>
+<form id="f"><input name="name" placeholder="আপনার নাম" required><input name="phone" type="tel" placeholder="মোবাইল নম্বর (01XXXXXXXXX)" required><textarea name="address" placeholder="পূর্ণ ঠিকানা" required></textarea>
+<select name="payment"><option value="cod">ক্যাশ অন ডেলিভারি</option><option value="bkash">bKash (আগে পেমেন্ট)</option></select>
+<div id="bk" hidden class="m">bKash-এ Send Money করুন: <b>${esc(CFG.bkash)}</b>, তারপর TrxID দিন<input name="trx" placeholder="TrxID"></div>
+<button>অর্ডার করুন</button><p id="er" class="m"></p></form>`;
+  app.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{const i=b.dataset.i;cart[i]=(cart[i]||0)+ +b.dataset.d;if(cart[i]<=0)delete cart[i];save();cartV()});
+  const f=$('#f');f.payment.onchange=()=>$('#bk').hidden=f.payment.value!=='bkash';
+  f.onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData(f));d.items=L.map(l=>({id:l.p.id,qty:l.q}));
+    const r=await J('/api/orders',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(d)});
+    if(r.error)return $('#er').textContent=r.error;
+    cart={};save();app.innerHTML=`<h2>ধন্যবাদ!</h2><p>আপনার অর্ডার কোড: <b>${esc(r.code)}</b></p><p class="m">কোডটি সংরক্ষণ করুন। কোড ও মোবাইল নম্বর দিয়ে অর্ডার ট্র্যাক করা যাবে।</p>`};
+}
+function track(){
+  app.innerHTML=`<h2>অর্ডার ট্র্যাক করুন</h2><form id="f"><input name="code" placeholder="অর্ডার কোড" required><input name="phone" type="tel" placeholder="মোবাইল নম্বর" required><button>দেখুন</button></form><p id="o"></p>`;
+  $('#f').onsubmit=async e=>{e.preventDefault();const r=await J('/api/track?'+new URLSearchParams(new FormData(e.target)));$('#o').textContent=r.error||`অবস্থা: ${ST[r.status]||r.status} • মোট ${bn(r.total)}`};
+}
+async function adminV(){
+  const t=sessionStorage.tk||prompt('অ্যাডমিন টোকেন');if(!t)return location.hash='#/';
+  const H={authorization:'Bearer '+t};
+  const A=async(u,b)=>{const r=await fetch('/api/admin/'+u,b?{method:'POST',headers:{...H,'content-type':'application/json'},body:JSON.stringify(b)}:{headers:H});if(r.status===401)throw 0;return r.json()};
+  const up=async f=>f&&f.size?(await(await fetch('/api/admin/upload?ext='+encodeURIComponent(f.name.split('.').pop()),{method:'POST',headers:H,body:f})).json()).url||'':'';
+  let O,L;try{O=await A('orders');L=await A('products')}catch{sessionStorage.tk='';alert('টোকেন ভুল');return location.hash='#/'}
+  sessionStorage.tk=t;
+  app.innerHTML=`<h2>অর্ডার</h2>${O.map(o=>`<div class="r"><span>#${esc(o.code)} ${esc(o.name)} ${esc(o.phone)}<br><span class="m">${esc(o.items)} • ${bn(o.total)} • ${esc(o.payment)} ${esc(o.trx)}<br>${esc(o.address)}</span></span><select data-o="${o.id}">${Object.keys(ST).map(s=>`<option value="${s}"${s==o.status?' selected':''}>${ST[s]}</option>`).join('')}</select></div>`).join('')||'<p class="m">কোনো অর্ডার নেই</p>'}
+<h2>নতুন পণ্য</h2><form id="pf"><input name="name" placeholder="পণ্যের নাম" required><input name="price" type="number" placeholder="দাম (টাকা)" required><textarea name="description" placeholder="বর্ণনা"></textarea><label class="m">ছবি (jpg/png/webp)</label><input name="image" type="file" accept="image/*"><label class="m">ভিডিও (MP4)</label><input name="video" type="file" accept="video/mp4"><button>সংরক্ষণ করুন</button></form>
+<h2>পণ্যের তালিকা</h2>${L.map(p=>`<div class="r"><span>${esc(p.name)} ${bn(p.price)}${p.active?'':' (লুকানো)'}</span><span><button class="s" data-pe="${p.id}">দাম</button> <button class="s" data-pt="${p.id}">${p.active?'লুকান':'দেখান'}</button></span></div>`).join('')}`;
+  app.querySelectorAll('[data-o]').forEach(s=>s.onchange=()=>A('status',{id:+s.dataset.o,status:s.value}));
+  app.querySelectorAll('[data-pe],[data-pt]').forEach(b=>b.onclick=async()=>{const p=L.find(x=>x.id==(b.dataset.pe||b.dataset.pt));
+    if(b.dataset.pe){const v=prompt('নতুন দাম',p.price);if(!v)return;p.price=+v}else p.active=p.active?0:1;
+    await A('product',p);await load();adminV()});
+  $('#pf').onsubmit=async e=>{e.preventDefault();const f=e.target,b=f.querySelector('button');b.disabled=true;b.textContent='আপলোড হচ্ছে…';
+    await A('product',{name:f.name.value,price:+f.price.value,description:f.description.value,image:await up(f.image.files[0]),video:await up(f.video.files[0]),active:1});
+    await load();adminV()};
+}
+function route(){
+  const [,a,b]=(location.hash.slice(1)||'/').split('/');scrollTo(0,0);
+  if(a==='p')return prod(+b);if(a==='cart')return cartV();if(a==='track')return track();if(a==='admin')return adminV();home();
+}
+addEventListener('hashchange',route);
+load().then(route).catch(()=>app.innerHTML='<p>লোড করা যায়নি। আবার চেষ্টা করুন।</p>');
+if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js');
+</script></body></html>

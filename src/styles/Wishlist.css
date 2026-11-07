@@ -1,0 +1,3 @@
+/* Wishlist reuses the cart-page empty state and the shared grid */
+@import './CartPage.css';
+@import './ProductGrid.css';

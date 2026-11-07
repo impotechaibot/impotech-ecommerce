@@ -1,0 +1,67 @@
+/* ---------- Promo banners ---------- */
+.banner-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.banner {
+  position: relative;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  aspect-ratio: 16 / 10;
+  display: block;
+  box-shadow: var(--shadow-md);
+  transition: border-color 0.3s var(--ease), transform 0.35s var(--ease);
+}
+.banner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.8s var(--ease);
+}
+.banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(5, 5, 7, 0) 35%,
+    rgba(5, 5, 7, 0.88) 100%
+  );
+}
+.banner:hover {
+  border-color: rgba(240, 180, 41, 0.4);
+}
+.banner:hover img {
+  transform: scale(1.07);
+}
+.banner-txt {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: 22px;
+  z-index: 2;
+  color: #fff;
+}
+.banner-txt b {
+  display: block;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  margin-bottom: 3px;
+}
+.banner-txt span {
+  font-size: 12.5px;
+  color: #b9b9c2;
+}
+
+@media (max-width: 900px) {
+  .banner-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .banner {
+    aspect-ratio: 16 / 8;
+  }
+}

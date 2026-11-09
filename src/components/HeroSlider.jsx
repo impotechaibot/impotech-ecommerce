@@ -1,88 +1,67 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FiChevronLeft, FiChevronRight, FiArrowRight } from 'react-icons/fi';
-import { useSiteConfig } from '../hooks/useSiteConfig.js';
-import '../styles/HeroSlider.css';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useStore } from '../context/StoreContext.jsx';
 
-const AUTOPLAY_MS = 6000;
-
-const HeroSlider = () => {
-  const { config: site } = useSiteConfig();
-  const slides = site.home.slides;
-  const [index, setIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
-
-  const go = useCallback((next) => {
-    setIndex((i) => (next + slides.length) % slides.length);
-  }, [slides.length]);
+export default function HeroSlider() {
+  const { settings } = useStore();
+  const slides = settings?.home?.slides || [];
+  const [i, setI] = useState(0);
 
   useEffect(() => {
-    if (paused) return undefined;
-    const t = setInterval(() => go(index + 1), AUTOPLAY_MS);
+    if (slides.length <= 1) return undefined;
+    const t = setInterval(() => setI((v) => (v + 1) % slides.length), 6000);
     return () => clearInterval(t);
-  }, [index, paused, go]);
+  }, [slides.length]);
+
+  if (!slides.length) return null;
+  const s = slides[i];
 
   return (
-    <section className="hero">
-      <div className="container">
-        <div
-          className="hero-slider"
-          onMouseEnter={() => setPaused(true)}
-          onMouseLeave={() => setPaused(false)}
-        >
-          <div className="slides">
-            {slides.map((s, i) => (
-              <div key={s.id} className={`slide ${i === index ? 'active' : ''}`}>
-                <img src={s.image} alt={s.title.join(' ')} />
-                <div className="slide-content">
-                  <span className="slide-tag">{s.tag}</span>
-                  <h1>
-                    {s.title[0]}
-                    <br />
-                    {s.title[1]}
-                  </h1>
-                  <p>{s.text}</p>
-                  <Link to="/products" className="slide-cta">
-                    {s.cta}
-                    <FiArrowRight size={16} />
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
+    <section className="relative h-[420px] sm:h-[520px] overflow-hidden">
+      <img src={s.image} alt={s.title} className="absolute inset-0 w-full h-full object-cover" />
+      <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/60 to-black/20" />
 
-          <button
-            type="button"
-            className="slider-arrow prev"
-            onClick={() => go(index - 1)}
-            aria-label="আগের স্লাইড"
-          >
-            <FiChevronLeft size={19} />
-          </button>
-          <button
-            type="button"
-            className="slider-arrow next"
-            onClick={() => go(index + 1)}
-            aria-label="পরের স্লাইড"
-          >
-            <FiChevronRight size={19} />
-          </button>
-
-          <div className="slider-dots">
-            {slides.map((s, i) => (
-              <button
-                key={s.id}
-                type="button"
-                className={i === index ? 'active' : ''}
-                onClick={() => go(i)}
-                aria-label={`স্লাইড ${i + 1}`}
-              />
-            ))}
+      <div className="container-x relative h-full flex items-center">
+        <div className="max-w-xl animate-fade-up" key={i}>
+          {s.tag && <span className="badge bg-accent text-black">{s.tag}</span>}
+          <h1 className="text-3xl sm:text-5xl font-bold mt-4 leading-tight">{s.title}</h1>
+          <p className="text-ink-muted mt-4 text-base sm:text-lg">{s.text}</p>
+          <div className="mt-7 flex flex-wrap gap-3">
+            <Link to={s.link || '/shop'} className="btn-primary">{s.cta || 'কেনাকাটা করুন'}</Link>
+            <Link to="/services" className="btn-outline">আমাদের সার্ভিস</Link>
           </div>
         </div>
       </div>
+
+      {slides.length > 1 && (
+        <>
+          <button
+            onClick={() => setI((v) => (v - 1 + slides.length) % slides.length)}
+            aria-label="আগের"
+            className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 grid place-items-center rounded-full bg-black/50 text-white hover:bg-black/70"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <button
+            onClick={() => setI((v) => (v + 1) % slides.length)}
+            aria-label="পরের"
+            className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 grid place-items-center rounded-full bg-black/50 text-white hover:bg-black/70"
+          >
+            <ChevronRight size={20} />
+          </button>
+          <div className="absolute bottom-5 left-1/2 -translate-x-1/2 flex gap-2">
+            {slides.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setI(idx)}
+                aria-label={`স্লাইড ${idx + 1}`}
+                className={`h-1.5 rounded-full transition-all ${idx === i ? 'w-8 bg-accent' : 'w-3 bg-white/40'}`}
+              />
+            ))}
+          </div>
+        </>
+      )}
     </section>
   );
-};
-
-export default HeroSlider;
+}

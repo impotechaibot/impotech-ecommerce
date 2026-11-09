@@ -1,55 +1,46 @@
 import { useState } from 'react';
-import { FiMail, FiCheck } from 'react-icons/fi';
-import { useSiteConfig } from '../hooks/useSiteConfig.js';
-import Reveal from './Reveal.jsx';
-import '../styles/Newsletter.css';
+import { Mail, Send } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { useStore } from '../context/StoreContext.jsx';
 
-const Newsletter = () => {
-  const { config: site } = useSiteConfig();
-  const news = site.home.newsletter;
+export default function Newsletter() {
+  const { settings } = useStore();
+  const nl = settings?.newsletter || {};
   const [email, setEmail] = useState('');
-  const [done, setDone] = useState(false);
 
   const submit = (e) => {
     e.preventDefault();
-    if (!email.trim()) return;
-    setDone(true);
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      toast.error('সঠিক ইমেইল দিন');
+      return;
+    }
+    toast.success('সাবস্ক্রাইব সফল! ধন্যবাদ।');
     setEmail('');
-    setTimeout(() => setDone(false), 3500);
   };
 
   return (
-    <section className="sec sec-tight" id="newsletter">
-      <div className="container">
-        <Reveal className="news-strip">
-          <div className="news-copy">
-            <h3>{news.title}</h3>
-            <p>{news.text}</p>
-          </div>
-          <form className="news-form" onSubmit={submit}>
-            <FiMail size={17} className="news-mail-ico" />
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="আপনার ইমেইল"
-              required
-              aria-label="ইমেইল"
-            />
-            <button type="submit">
-              {done ? (
-                <>
-                  <FiCheck size={15} /> {news.button}
-                </>
-              ) : (
-                news.button
-              )}
-            </button>
-          </form>
-        </Reveal>
+    <section className="container-x py-14">
+      <div className="card p-8 sm:p-10 bg-gradient-to-br from-surface to-surface2 text-center">
+        <Mail className="mx-auto text-accent" size={28} />
+        <h3 className="text-xl sm:text-2xl font-semibold mt-3">
+          {nl.title || 'নিউজলেটার'}
+        </h3>
+        <p className="text-ink-muted mt-1.5 text-sm">
+          {nl.text || 'নতুন অফার সবার আগে পান'}
+        </p>
+        <form onSubmit={submit} className="mt-5 flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+          <input
+            type="email"
+            className="input"
+            placeholder="আপনার ইমেইল"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <button type="submit" className="btn-primary shrink-0">
+            <Send size={16} /> {nl.button || 'সাবস্ক্রাইব'}
+          </button>
+        </form>
       </div>
     </section>
   );
-};
-
-export default Newsletter;
+}

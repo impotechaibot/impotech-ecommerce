@@ -1,82 +1,61 @@
 import { useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
-import Navbar from './components/Navbar.jsx';
+import Header from './components/Header.jsx';
 import Footer from './components/Footer.jsx';
-import CartDrawer from './components/CartDrawer.jsx';
-import Toast from './components/Toast.jsx';
-import ThemeLayer from './components/ThemeLayer.jsx';
-import SeoLayer from './components/SeoLayer.jsx';
 import Home from './pages/Home.jsx';
-import Products from './pages/Products.jsx';
+import Shop from './pages/Shop.jsx';
 import ProductDetail from './pages/ProductDetail.jsx';
-import Search from './pages/Search.jsx';
-import CartPage from './pages/CartPage.jsx';
-import Wishlist from './pages/Wishlist.jsx';
+import Cart from './pages/Cart.jsx';
 import Checkout from './pages/Checkout.jsx';
+import OrderSuccess from './pages/OrderSuccess.jsx';
 import Track from './pages/Track.jsx';
-import ContentPage from './pages/ContentPage.jsx';
-import Admin from './pages/Admin.jsx';
-import { useBackground } from './hooks/useBackground.js';
+import Account from './pages/Account.jsx';
+import Wishlist from './pages/Wishlist.jsx';
+import Services from './pages/Services.jsx';
+import ServiceDetail from './pages/ServiceDetail.jsx';
+import Blog from './pages/Blog.jsx';
+import Faq from './pages/Faq.jsx';
+import Policy from './pages/Policy.jsx';
+import Contact from './pages/Contact.jsx';
+import LandingPage from './pages/LandingPage.jsx';
+import NotFound from './pages/NotFound.jsx';
 
-// Scroll to top on every route change (except hash links).
-const ScrollToTop = () => {
+/** রুট বদলালে উপরে স্ক্রল */
+function ScrollToTop() {
   const { pathname } = useLocation();
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' });
+    window.scrollTo(0, 0);
   }, [pathname]);
   return null;
-};
+}
 
-// Applies the admin-chosen background to every route.
-const BackgroundLayer = () => {
-  const { config } = useBackground();
-  const style =
-    config.type === 'image' && config.image
-      ? {
-          backgroundColor: config.color,
-          backgroundImage: `url(${config.image})`,
-        }
-      : { backgroundColor: config.color || '#08080a' };
-
+export default function App() {
   return (
-    <>
-      <div className="app-bg" style={style} />
-      <div
-        className="app-bg-overlay"
-        style={{ opacity: config.type === 'image' ? config.overlay / 100 : 0 }}
-      />
-    </>
+    <div className="min-h-screen flex flex-col">
+      <ScrollToTop />
+      <Header />
+      <main className="flex-1">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/shop" element={<Shop />} />
+          <Route path="/product/:slug" element={<ProductDetail />} />
+          <Route path="/cart" element={<Cart />} />
+          <Route path="/checkout" element={<Checkout />} />
+          <Route path="/order-success/:code" element={<OrderSuccess />} />
+          <Route path="/track" element={<Track />} />
+          <Route path="/account" element={<Account />} />
+          <Route path="/wishlist" element={<Wishlist />} />
+          <Route path="/services" element={<Services />} />
+          <Route path="/service/:slug" element={<ServiceDetail />} />
+          <Route path="/blog" element={<Blog />} />
+          <Route path="/faq" element={<Faq />} />
+          <Route path="/policy/:slug" element={<Policy />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/lp/:slug" element={<LandingPage />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </main>
+      <Footer />
+    </div>
   );
-};
-
-const App = () => (
-  <div className="App">
-    <ThemeLayer />
-    <SeoLayer />
-    <BackgroundLayer />
-    <ScrollToTop />
-    <Navbar />
-
-    <main>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/products" element={<Products />} />
-        <Route path="/product/:id" element={<ProductDetail />} />
-        <Route path="/search" element={<Search />} />
-        <Route path="/cart" element={<CartPage />} />
-        <Route path="/wishlist" element={<Wishlist />} />
-        <Route path="/checkout" element={<Checkout />} />
-        <Route path="/track" element={<Track />} />
-        <Route path="/page/:slug" element={<ContentPage />} />
-        <Route path="/admin" element={<Admin />} />
-        <Route path="*" element={<Home />} />
-      </Routes>
-    </main>
-
-    <Footer />
-    <CartDrawer />
-    <Toast />
-  </div>
-);
-
-export default App;
+}

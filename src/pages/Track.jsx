@@ -1,113 +1,135 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { FiPackage, FiCheck, FiSearch } from 'react-icons/fi';
-import { useOrders, ORDER_STATUSES } from '../hooks/useOrders.js';
-import { formatMoney } from '../utils/format.js';
-import '../styles/Track.css';
+import { Package, Search, CheckCircle2, Truck, Home, Clock } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { useStore } from '../context/StoreContext.jsx';
+import { money, dateTimeBn, ORDER_STATUS, PAYMENT_LABEL, toBn } from '../lib/format.js';
+import Seo from '../components/Seo.jsx';
 
-const Track = () => {
-  const { findOrder } = useOrders();
-  const [id, setId] = useState('');
-  const [result, setResult] = useState(null);
-  const [notFound, setNotFound] = useState(false);
+const STEPS = [
+  { id: 'new', label: 'অর্ডার গৃহীত', icon: CheckCircle2 },
+  { id: 'processing', label: 'প্রসেসিং', icon: Clock },
+  { id: 'shipped', label: 'শিপড', icon: Truck },
+  { id: 'delivered', label: 'ডেলিভারড', icon: Home },
+];
 
-  const submit = (e) => {
+export default function Track() {
+  const { findOrder } = useStore();
+  const [code, setCode] = useState('');
+  const [phone, setPhone] = useState('');
+  const [order, setOrder] = useState(null);
+  const [searched, setSearched] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e) => {
     e.preventDefault();
-    const q = id.trim();
-    if (!q) return;
-    const order = findOrder(q);
-    if (order) {
-      setResult(order);
-      setNotFound(false);
-    } else {
-      setResult(null);
-      setNotFound(true);
+    if (!code.trim() || !phone.trim()) {
+      toast.error('অর্ডার নম্বর ও মোবাইল নম্বর দুটোই দিন');
+      return;
+    }
+    setLoading(true);
+    try {
+      const found = await findOrder(code.trim(), phone.trim());
+      setOrder(found);
+      setSearched(true);
+      if (!found) toast.error('এই তথ্যে কোনো অর্ডার পাওয়া যায়নি');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Map the order status onto the 4-step progress bar.
-  const stepIndex = (status) => {
-    const order = ['new', 'processing', 'shipped', 'delivered'];
-    const i = order.indexOf(status);
-    return i < 0 ? 0 : i;
-  };
+  const currentStep = order ? STEPS.findIndex((s) => s.id === order.status) : -1;
 
   return (
-    <div className="page">
-      <div className="container">
-        <nav className="crumbs">
-          <Link to="/">হোম</Link>
-          <span>/</span>
-          <span>অর্ডার ট্র্যাকিং</span>
-        </nav>
+    <div className="container-x py-12 max-w-3xl">
+      <Seo title="অর্ডার ট্র্যাক — ইম্পোটেক" />
+      <div className="text-center mb-8">
+        <Package size={40} className="mx-auto text-accent" />
+        <h1 className="text-2xl font-semibold mt-4">অর্ডার ট্র্যাক করুন</h1>
+        <p className="text-ink-muted mt-2 text-sm">অর্ডার নম্বর ও মোবাইল নম্বর দিয়ে আপনার অর্ডারের অবস্থা জানুন।</p>
+      </div>
 
-        <div className="track-wrap">
-          <div className="track-head">
-            <div className="track-ico">
-              <FiPackage size={26} />
+      <form onSubmit={submit} className="card p-6 grid sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+        <div>
+          <label className="label">অর্ডার নম্বর</label>
+          <input className="input" placeholder="IMP-1001" value={code} onChange={(e) => setCode(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">মোবাইল নম্বর</label>
+          <input className="input" placeholder="01XXXXXXXXX" value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="numeric" />
+        </div>
+        <button type="submit" className="btn-primary" disabled={loading}>
+          <Search size={16} /> {loading ? 'খোঁজা হচ্ছে…' : 'ট্র্যাক'}
+        </button>
+      </form>
+
+      {searched && order && (
+        <div className="card p-6 mt-6">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <p className="text-sm text-ink-muted">অর্ডার নম্বর</p>
+              <p className="font-semibold text-accent">{order.order_code}</p>
             </div>
-            <h1>অর্ডার ট্র্যাক করুন</h1>
-            <p>আপনার অর্ডার আইডি দিয়ে ডেলিভারি স্ট্যাটাস দেখুন।</p>
+            <span className="badge bg-accent/15 text-accent">{ORDER_STATUS[order.status] || order.status}</span>
           </div>
 
-          <form className="track-form" onSubmit={submit}>
-            <FiSearch size={17} />
-            <input
-              value={id}
-              onChange={(e) => setId(e.target.value)}
-              placeholder="অর্ডার আইডি (যেমন: IMP123456)"
-              aria-label="অর্ডার আইডি"
-            />
-            <button type="submit">ট্র্যাক করুন</button>
-          </form>
+          {/* স্টেপার */}
+          <div className="flex items-center justify-between mt-8 mb-2">
+            {STEPS.map((s, i) => {
+              const done = i <= currentStep;
+              return (
+                <div key={s.id} className="flex-1 flex flex-col items-center relative">
+                  {i > 0 && (
+                    <span className={`absolute top-5 right-1/2 w-full h-0.5 ${i <= currentStep ? 'bg-accent' : 'bg-line'}`} />
+                  )}
+                  <span className={`relative z-10 w-10 h-10 grid place-items-center rounded-full ${done ? 'bg-accent text-black' : 'bg-surface2 text-ink-muted'}`}>
+                    <s.icon size={18} />
+                  </span>
+                  <span className={`text-xs mt-2 text-center ${done ? 'text-accent' : 'text-ink-muted'}`}>{s.label}</span>
+                </div>
+              );
+            })}
+          </div>
 
-          {notFound && (
-            <div className="track-result">
-              <p className="tr-note">
-                এই আইডিতে কোনো অর্ডার পাওয়া যায়নি। আইডিটি আবার যাচাই করুন।
-              </p>
+          <div className="border-t border-line mt-6 pt-5 space-y-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-ink-muted">তারিখ</span>
+              <span>{dateTimeBn(order.created_at)}</span>
             </div>
-          )}
+            <div className="flex justify-between">
+              <span className="text-ink-muted">কাস্টমার</span>
+              <span>{order.customer_name}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-ink-muted">পেমেন্ট</span>
+              <span>{PAYMENT_LABEL[order.payment_method] || order.payment_method}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-ink-muted">মোট</span>
+              <span className="font-semibold text-accent">{money(order.total)}</span>
+            </div>
+          </div>
 
-          {result && (
-            <div className="track-result">
-              <p className="tr-id">
-                অর্ডার <b>{result.id}</b>
-              </p>
-              <div className="tr-steps">
-                {ORDER_STATUSES.slice(0, 4).map((s, i) => (
-                  <div
-                    key={s.id}
-                    className={`tr-step ${i <= stepIndex(result.status) ? 'done' : ''} ${
-                      i === stepIndex(result.status) ? 'now' : ''
-                    }`}
-                  >
-                    <span className="tr-dot">
-                      {i <= stepIndex(result.status) ? <FiCheck size={13} /> : null}
-                    </span>
-                    <span className="tr-label">{s.label}</span>
+          {order.items && order.items.length > 0 && (
+            <div className="border-t border-line mt-5 pt-5">
+              <p className="text-sm font-medium mb-3">আইটেম ({toBn(order.items.length)})</p>
+              <div className="space-y-2">
+                {order.items.map((it, i) => (
+                  <div key={i} className="flex items-center justify-between text-sm">
+                    <span className="text-ink-muted">{it.name} × {toBn(it.qty)}</span>
+                    <span>{money(Number(it.price) * Number(it.qty))}</span>
                   </div>
                 ))}
-              </div>
-              <div className="tr-meta">
-                <p>
-                  মোট: <b>{formatMoney(result.total)}</b> · পেমেন্ট:{' '}
-                  <b>{result.payment}</b>
-                </p>
-                <p>
-                  স্ট্যাটাস:{' '}
-                  <b>
-                    {ORDER_STATUSES.find((s) => s.id === result.status)?.label ||
-                      'নতুন'}
-                  </b>
-                </p>
               </div>
             </div>
           )}
         </div>
-      </div>
+      )}
+
+      {searched && !order && (
+        <div className="card p-12 mt-6 text-center">
+          <p className="text-ink-muted">এই তথ্যে কোনো অর্ডার পাওয়া যায়নি। অর্ডার নম্বর ও মোবাইল নম্বর আবার যাচাই করুন।</p>
+        </div>
+      )}
     </div>
   );
-};
-
-export default Track;
+}

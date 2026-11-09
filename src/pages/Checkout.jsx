@@ -1,359 +1,263 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
-import {
-  FiCheck,
-  FiTruck,
-  FiCreditCard,
-  FiSmartphone,
-  FiLock,
-  FiArrowLeft,
-  FiTag,
-  FiX,
-} from 'react-icons/fi';
-import { cartActions } from '../redux-state/CartState.js';
-import { uiActions } from '../redux-state/UiState.js';
-import { useCartWithProducts } from '../hooks/useCartWithProducts.js';
-import { useSiteConfig } from '../hooks/useSiteConfig.js';
-import { validateCoupon } from '../hooks/useCoupons.js';
-import { useOrders, makeOrderId } from '../hooks/useOrders.js';
-import { formatMoney, productImage } from '../utils/format.js';
-import '../styles/Checkout.css';
+import { Check, Tag, Truck, CreditCard, Wallet, Banknote } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { useStore } from '../context/StoreContext.jsx';
+import { localdb } from '../lib/localdb.js';
+import { money, toBn } from '../lib/format.js';
+import Seo from '../components/Seo.jsx';
 
-const Checkout = () => {
-  const dispatch = useDispatch();
+export default function Checkout() {
+  const { cart, cartSubtotal, clearCart, settings, placeOrder, customer } = useStore();
   const navigate = useNavigate();
-  const { items, total } = useCartWithProducts();
-  const { config: site } = useSiteConfig();
-  const { addOrder } = useOrders();
-  const co = site.checkout;
+  const checkout = settings?.checkout || {};
 
   const [form, setForm] = useState({
-    name: '',
-    phone: '',
-    email: '',
+    name: customer?.name || '',
+    phone: customer?.phone || '',
+    email: customer?.email || '',
     address: '',
     city: 'ঢাকা',
     note: '',
   });
-  const [payment, setPayment] = useState('cod');
-  const [placed, setPlaced] = useState(false);
-  const [orderId, setOrderId] = useState('');
+  const [payment, setPayment] = useState(checkout.codEnabled ? 'cod' : 'bkash');
+  const [coupon, setCoupon] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  // coupon state
-  const [couponInput, setCouponInput] = useState('');
-  const [coupon, setCoupon] = useState(null); // {code, discount}
-  const [couponErr, setCouponErr] = useState('');
+  const freeAbove = Number(checkout.freeDeliveryAbove || 0);
+  const shipping = cartSubtotal >= freeAbove && freeAbove > 0 ? 0 : Number(checkout.deliveryCharge || 0);
+  const discount = appliedCoupon
+    ? appliedCoupon.type === 'percent'
+      ? Math.round((cartSubtotal * Number(appliedCoupon.value)) / 100)
+      : Number(appliedCoupon.value)
+    : 0;
+  const total = Math.max(0, cartSubtotal + shipping - discount);
 
-  // Build the payment options from the admin config.
-  const PAYMENTS = [
-    co.codEnabled && { id: 'cod', label: 'ক্যাশ অন ডেলিভারি', icon: FiTruck },
-    co.bkashEnabled && { id: 'bkash', label: 'বিকাশ', icon: FiSmartphone },
-    co.nagadEnabled && { id: 'nagad', label: 'নগদ', icon: FiSmartphone },
-    co.rocketEnabled && { id: 'rocket', label: 'রকেট', icon: FiSmartphone },
-    { id: 'card', label: 'কার্ড', icon: FiCreditCard },
-  ].filter(Boolean);
-
-  const shipping =
-    total >= co.freeDeliveryAbove ? 0 : co.deliveryCharge;
-  const discount = coupon ? coupon.discount : 0;
-  const grandTotal = Math.max(0, total - discount) + shipping;
-
-  const change = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
+  const paymentOptions = useMemo(() => {
+    const opts = [];
+    if (checkout.codEnabled) opts.push({ id: 'cod', label: 'ক্যাশ অন ডেলিভারি', icon: Banknote, hint: 'পণ্য হাতে পেয়ে টাকা দিন' });
+    if (checkout.bkashEnabled) opts.push({ id: 'bkash', label: 'বিকাশ', icon: Wallet, hint: checkout.bkashNumber ? `পেমেন্ট নম্বর: ${checkout.bkashNumber}` : '' });
+    if (checkout.nagadEnabled) opts.push({ id: 'nagad', label: 'নগদ', icon: Wallet, hint: checkout.nagadNumber ? `পেমেন্ট নম্বর: ${checkout.nagadNumber}` : '' });
+    if (checkout.rocketEnabled) opts.push({ id: 'rocket', label: 'রকেট', icon: Wallet, hint: checkout.rocketNumber ? `পেমেন্ট নম্বর: ${checkout.rocketNumber}` : '' });
+    opts.push({ id: 'card', label: 'কার্ড / অনলাইন', icon: CreditCard, hint: 'ভিসা / মাস্টারকার্ড' });
+    return opts;
+  }, [checkout]);
 
   const applyCoupon = () => {
-    const res = validateCoupon(couponInput, total);
-    if (res.ok) {
-      setCoupon({ code: res.coupon.code, discount: res.discount });
-      setCouponErr('');
-    } else {
-      setCoupon(null);
-      setCouponErr(res.reason);
+    const code = coupon.trim().toUpperCase();
+    if (!code) return;
+    const list = localdb.listCoupons();
+    const found = list.find((c) => (c.code || '').toUpperCase() === code);
+    if (!found) {
+      toast.error('কুপন কোডটি সঠিক নয়');
+      return;
+    }
+    if (found.min_order && cartSubtotal < Number(found.min_order)) {
+      toast.error(`এই কুপনের জন্য কমপক্ষে ${money(found.min_order)} কেনাকাটা করতে হবে`);
+      return;
+    }
+    setAppliedCoupon(found);
+    toast.success('কুপন প্রয়োগ হয়েছে');
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim()) { toast.error('নাম দিন'); return; }
+    if (!/^01[3-9]\d{8}$/.test(form.phone.trim())) { toast.error('সঠিক মোবাইল নম্বর দিন (১১ ডিজিট)'); return; }
+    if (!form.address.trim()) { toast.error('ঠিকানা দিন'); return; }
+    if (cart.length === 0) { toast.error('কার্ট খালি'); return; }
+
+    setSubmitting(true);
+    try {
+      const order = {
+        order_code: localdb.nextOrderCode(),
+        customer_name: form.name.trim(),
+        customer_phone: form.phone.trim(),
+        customer_email: form.email.trim(),
+        customer_address: `${form.address.trim()}, ${form.city}`,
+        city: form.city,
+        note: form.note.trim(),
+        items: cart.map((i) => ({
+          product_id: i.id,
+          name: i.name,
+          slug: i.slug,
+          price: Number(i.price),
+          qty: Number(i.qty),
+          variant: i.variant || '',
+          image: i.image,
+        })),
+        subtotal: cartSubtotal,
+        shipping,
+        discount,
+        coupon_code: appliedCoupon?.code || '',
+        total,
+        payment_method: payment,
+        status: 'new',
+      };
+
+      const saved = await placeOrder(order);
+      clearCart();
+      toast.success('অর্ডার সফল হয়েছে!');
+      navigate(`/order-success/${saved.order_code}`, { state: { order: saved } });
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(err);
+      toast.error('অর্ডার করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const removeCoupon = () => {
-    setCoupon(null);
-    setCouponInput('');
-    setCouponErr('');
-  };
-
-  const submit = (e) => {
-    e.preventDefault();
-    const id = makeOrderId();
-    const order = {
-      id,
-      items: items.map((i) => ({
-        id: i.id,
-        name: i.name,
-        bn: i.bn,
-        price: i.price,
-        quantity: i.quantity,
-        image: i.image,
-      })),
-      customer: {
-        name: form.name,
-        phone: form.phone,
-        email: form.email,
-        address: form.address,
-        city: form.city,
-      },
-      payment,
-      subtotal: total,
-      shipping,
-      discount,
-      coupon: coupon ? coupon.code : '',
-      total: grandTotal,
-      status: 'new',
-      note: form.note,
-      createdAt: new Date().toISOString(),
-    };
-    addOrder(order);
-    setOrderId(id);
-    setPlaced(true);
-    dispatch(cartActions.clearCart());
-    dispatch(uiActions.showToast('অর্ডার সফলভাবে প্লেস হয়েছে'));
-  };
-
-  if (placed) {
+  if (cart.length === 0) {
     return (
-      <div className="page">
-        <div className="container">
-          <div className="order-success">
-            <div className="os-icon">
-              <FiCheck size={32} />
-            </div>
-            <h1>অর্ডার কনফার্ম হয়েছে!</h1>
-            <p>
-              আপনার অর্ডার নম্বর <b>{orderId}</b>. {co.confirmMessage}
-            </p>
-            <div className="os-actions">
-              <Link to="/" className="btn-primary">
-                হোমে ফিরুন
-              </Link>
-              <Link to="/track" className="btn-ghost">
-                অর্ডার ট্র্যাক করুন
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (items.length === 0) {
-    return (
-      <div className="page">
-        <div className="container">
-          <div className="cart-empty">
-            <h1>চেকআউট করার জন্য কার্টে পণ্য নেই</h1>
-            <p>প্রথমে পছন্দের পণ্য কার্টে যোগ করুন।</p>
-            <button type="button" className="btn-primary" onClick={() => navigate('/products')}>
-              পণ্য দেখুন
-            </button>
-          </div>
-        </div>
+      <div className="container-x py-24 text-center">
+        <Seo title="চেকআউট — ইম্পোটেক" />
+        <h1 className="text-2xl font-semibold">কার্ট খালি</h1>
+        <p className="text-ink-muted mt-2">চেকআউট করতে আগে পণ্য যোগ করুন।</p>
+        <Link to="/shop" className="btn-primary mt-6">কেনাকাটা করুন</Link>
       </div>
     );
   }
 
   return (
-    <div className="page">
-      <div className="container">
-        <nav className="crumbs">
-          <Link to="/">হোম</Link>
-          <span>/</span>
-          <Link to="/cart">কার্ট</Link>
-          <span>/</span>
-          <span>চেকআউট</span>
-        </nav>
+    <div className="container-x py-8">
+      <Seo title="চেকআউট — ইম্পোটেক" />
+      <h1 className="text-2xl font-semibold mb-6">চেকআউট</h1>
 
-        <div className="page-head">
-          <div>
-            <h1>চেকআউট</h1>
-            <p>ডেলিভারি তথ্য দিন এবং অর্ডার কনফার্ম করুন</p>
+      <form onSubmit={submit} className="grid lg:grid-cols-[1fr_380px] gap-6">
+        <div className="space-y-5">
+          {/* ডেলিভারি তথ্য */}
+          <div className="card p-6">
+            <h2 className="font-semibold mb-4 flex items-center gap-2">
+              <Truck size={18} className="text-accent" /> ডেলিভারি তথ্য
+            </h2>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className="label">পূর্ণ নাম *</label>
+                <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="আপনার নাম" />
+              </div>
+              <div>
+                <label className="label">মোবাইল নম্বর *</label>
+                <input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="01XXXXXXXXX" inputMode="numeric" />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="label">ইমেইল (ঐচ্ছিক)</label>
+                <input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="label">সম্পূর্ণ ঠিকানা *</label>
+                <textarea className="input min-h-[80px]" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="বাসা/রোড/এলাকা" />
+              </div>
+              <div>
+                <label className="label">জেলা / শহর</label>
+                <input className="input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+              </div>
+              <div>
+                <label className="label">অর্ডার নোট (ঐচ্ছিক)</label>
+                <input className="input" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="বিশেষ নির্দেশনা" />
+              </div>
+            </div>
+          </div>
+
+          {/* পেমেন্ট */}
+          <div className="card p-6">
+            <h2 className="font-semibold mb-4 flex items-center gap-2">
+              <CreditCard size={18} className="text-accent" /> পেমেন্ট পদ্ধতি
+            </h2>
+            <div className="space-y-2.5">
+              {paymentOptions.map((opt) => (
+                <label
+                  key={opt.id}
+                  className={`flex items-center gap-3 p-4 rounded-field border cursor-pointer transition-colors ${
+                    payment === opt.id ? 'border-accent bg-accent/5' : 'border-line hover:border-accent/40'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="payment"
+                    value={opt.id}
+                    checked={payment === opt.id}
+                    onChange={() => setPayment(opt.id)}
+                    className="accent-accent"
+                  />
+                  <opt.icon size={18} className="text-accent" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{opt.label}</p>
+                    {opt.hint && <p className="text-xs text-ink-muted mt-0.5">{opt.hint}</p>}
+                  </div>
+                  {payment === opt.id && <Check size={18} className="text-accent" />}
+                </label>
+              ))}
+            </div>
+            {checkout.paymentNote && (
+              <p className="text-xs text-ink-muted mt-4 bg-surface2 rounded-field p-3">{checkout.paymentNote}</p>
+            )}
           </div>
         </div>
 
-        <form className="checkout-layout" onSubmit={submit}>
-          <div className="co-form">
-            <section className="co-card">
-              <h3>ডেলিভারি তথ্য</h3>
-              <div className="co-grid">
-                <label>
-                  <span>পুরো নাম *</span>
-                  <input
-                    name="name"
-                    value={form.name}
-                    onChange={change}
-                    required
-                    placeholder="আপনার নাম"
-                  />
-                </label>
-                <label>
-                  <span>মোবাইল নম্বর *</span>
-                  <input
-                    name="phone"
-                    value={form.phone}
-                    onChange={change}
-                    required
-                    placeholder="017XXXXXXXX"
-                    pattern="[0-9+\- ]{11,}"
-                  />
-                </label>
-                <label className="full">
-                  <span>ইমেইল (অপশনাল)</span>
-                  <input
-                    type="email"
-                    name="email"
-                    value={form.email}
-                    onChange={change}
-                    placeholder="you@example.com"
-                  />
-                </label>
-                <label className="full">
-                  <span>সম্পূর্ণ ঠিকানা *</span>
-                  <input
-                    name="address"
-                    value={form.address}
-                    onChange={change}
-                    required
-                    placeholder="বাসা / রোড / এলাকা"
-                  />
-                </label>
-                <label>
-                  <span>জেলা / শহর *</span>
-                  <input name="city" value={form.city} onChange={change} required />
-                </label>
-                <label>
-                  <span>অর্ডার নোট (অপশনাল)</span>
-                  <input
-                    name="note"
-                    value={form.note}
-                    onChange={change}
-                    placeholder="যেমন: বিকালে কল করুন"
-                  />
-                </label>
-              </div>
-            </section>
+        {/* সারাংশ */}
+        <div className="card p-6 h-fit lg:sticky lg:top-24">
+          <h2 className="font-semibold mb-4">অর্ডার সারাংশ</h2>
 
-            <section className="co-card">
-              <h3>পেমেন্ট মেথড</h3>
-              <div className="pay-row">
-                {PAYMENTS.map(({ id, label, icon: Icon }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    className={`pay-opt ${payment === id ? 'on' : ''}`}
-                    onClick={() => setPayment(id)}
-                  >
-                    <Icon size={17} />
-                    {label}
-                    {payment === id && <FiCheck size={14} className="pay-check" />}
-                  </button>
-                ))}
+          <div className="space-y-3 max-h-56 overflow-y-auto mb-4">
+            {cart.map((i) => (
+              <div key={i.key} className="flex gap-3 text-sm">
+                <div className="w-12 h-12 rounded-field overflow-hidden bg-surface2 shrink-0">
+                  <img src={i.image} alt={i.name} className="w-full h-full object-cover" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="clamp-2 leading-snug">{i.name}</p>
+                  <p className="text-xs text-ink-muted">{toBn(i.qty)} × {money(i.price)}</p>
+                </div>
+                <p className="font-medium">{money(Number(i.price) * Number(i.qty))}</p>
               </div>
-              {(payment === 'bkash' || payment === 'nagad' || payment === 'rocket') && (
-                <p className="co-pay-note">
-                  {payment === 'bkash' && co.bkashNumber && (
-                    <>বিকাশ (পার্সোনাল): <b>{co.bkashNumber}</b><br /></>
-                  )}
-                  {payment === 'nagad' && co.nagadNumber && (
-                    <>নগদ (পার্সোনাল): <b>{co.nagadNumber}</b><br /></>
-                  )}
-                  {payment === 'rocket' && co.rocketNumber && (
-                    <>রকেট: <b>{co.rocketNumber}</b><br /></>
-                  )}
-                  {co.paymentNote}
-                </p>
-              )}
-            </section>
+            ))}
           </div>
 
-          <aside className="co-summary">
-            <h3>অর্ডার সারাংশ</h3>
-
-            <div className="co-items">
-              {items.map((item) => (
-                <div key={item.id} className="co-item">
-                  <span className="co-thumb">
-                    <img src={productImage({ images: [item.image] }, 0)} alt="" />
-                    <i>{item.quantity}</i>
-                  </span>
-                  <span className="co-it-name">{item.bn || item.name}</span>
-                  <b>{formatMoney(item.price * item.quantity)}</b>
-                </div>
-              ))}
+          {/* কুপন */}
+          <div className="flex gap-2 mb-4">
+            <div className="relative flex-1">
+              <Tag size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
+              <input
+                className="input pl-9"
+                placeholder="কুপন কোড"
+                value={coupon}
+                onChange={(e) => setCoupon(e.target.value)}
+              />
             </div>
+            <button type="button" className="btn-outline shrink-0" onClick={applyCoupon}>প্রয়োগ</button>
+          </div>
 
-            {/* coupon */}
-            <div className="co-coupon">
-              {coupon ? (
-                <div className="co-coupon-applied">
-                  <span>
-                    <FiTag size={14} /> {coupon.code}
-                  </span>
-                  <button type="button" onClick={removeCoupon} aria-label="কুপন সরান">
-                    <FiX size={14} />
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="co-coupon-row">
-                    <FiTag size={14} />
-                    <input
-                      value={couponInput}
-                      onChange={(e) => setCouponInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          applyCoupon();
-                        }
-                      }}
-                      placeholder="কুপন কোড"
-                      aria-label="কুপন কোড"
-                    />
-                    <button type="button" onClick={applyCoupon}>
-                      প্রয়োগ
-                    </button>
-                  </div>
-                  {couponErr && <p className="co-coupon-err">{couponErr}</p>}
-                </>
-              )}
+          <div className="space-y-3 text-sm border-t border-line pt-4">
+            <div className="flex justify-between">
+              <span className="text-ink-muted">সাবটোটাল</span>
+              <span>{money(cartSubtotal)}</span>
             </div>
-
-            <div className="cs-row">
-              <span>সাবটোটাল</span>
-              <b>{formatMoney(total)}</b>
+            <div className="flex justify-between">
+              <span className="text-ink-muted">ডেলিভারি চার্জ</span>
+              <span>{shipping === 0 ? <span className="text-emerald-400">ফ্রি</span> : money(shipping)}</span>
             </div>
             {discount > 0 && (
-              <div className="cs-row">
-                <span>ছাড়</span>
-                <b className="cs-discount">-{formatMoney(discount)}</b>
+              <div className="flex justify-between text-emerald-400">
+                <span>ডিসকাউন্ট ({appliedCoupon?.code})</span>
+                <span>-{money(discount)}</span>
               </div>
             )}
-            <div className="cs-row">
-              <span>ডেলিভারি</span>
-              <b>{shipping === 0 ? 'ফ্রি' : formatMoney(shipping)}</b>
+            <div className="border-t border-line pt-3 flex justify-between text-base font-semibold">
+              <span>সর্বমোট</span>
+              <span className="text-accent">{money(total)}</span>
             </div>
-            <div className="cs-total">
-              <span>মোট প্রদেয়</span>
-              <b>{formatMoney(grandTotal)}</b>
-            </div>
+          </div>
 
-            <button type="submit" className="btn-primary">
-              <FiLock size={15} /> অর্ডার কনফার্ম করুন
-            </button>
-            <Link to="/cart" className="co-back">
-              <FiArrowLeft size={14} /> কার্টে ফিরুন
-            </Link>
-          </aside>
-        </form>
-      </div>
+          <button type="submit" className="btn-primary w-full mt-5" disabled={submitting}>
+            {submitting ? 'অর্ডার হচ্ছে…' : 'অর্ডার নিশ্চিত করুন'}
+          </button>
+          <p className="text-xs text-ink-muted text-center mt-3">
+            অর্ডার করলে আপনি আমাদের শর্তাবলী মেনে নিচ্ছেন।
+          </p>
+        </div>
+      </form>
     </div>
   );
-};
-
-export default Checkout;
+}

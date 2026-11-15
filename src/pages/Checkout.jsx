@@ -1,263 +1,487 @@
-import { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Check, Tag, Truck, CreditCard, Wallet, Banknote } from 'lucide-react';
-import toast from 'react-hot-toast';
-import { useStore } from '../context/StoreContext.jsx';
-import { localdb } from '../lib/localdb.js';
-import { money, toBn } from '../lib/format.js';
-import Seo from '../components/Seo.jsx';
+
+import React, { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useStore } from "../context/StoreContext";
+
+const SHIPPING_CHARGE = 80;
+
+const initialForm = {
+  customer_name: "",
+  customer_phone: "",
+  customer_address: "",
+  note: "",
+};
+
+const money = (value) =>
+  `৳${Number(value || 0).toLocaleString("en-BD")}`;
+
+const createOrderCode = () => {
+  const date = new Date();
+  const datePart = date
+    .toISOString()
+    .replace(/[-:TZ.]/g, "")
+    .slice(0, 14);
+
+  const randomPart = Math.floor(1000 + Math.random() * 9000);
+
+  return `IMP-${datePart}-${randomPart}`;
+};
 
 export default function Checkout() {
-  const { cart, cartSubtotal, clearCart, settings, placeOrder, customer } = useStore();
   const navigate = useNavigate();
-  const checkout = settings?.checkout || {};
 
-  const [form, setForm] = useState({
-    name: customer?.name || '',
-    phone: customer?.phone || '',
-    email: customer?.email || '',
-    address: '',
-    city: 'ঢাকা',
-    note: '',
-  });
-  const [payment, setPayment] = useState(checkout.codEnabled ? 'cod' : 'bkash');
-  const [coupon, setCoupon] = useState('');
-  const [appliedCoupon, setAppliedCoupon] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
+  const {
+    cart = [],
+    clearCart,
+    placeOrder,
+  } = useStore();
 
-  const freeAbove = Number(checkout.freeDeliveryAbove || 0);
-  const shipping = cartSubtotal >= freeAbove && freeAbove > 0 ? 0 : Number(checkout.deliveryCharge || 0);
-  const discount = appliedCoupon
-    ? appliedCoupon.type === 'percent'
-      ? Math.round((cartSubtotal * Number(appliedCoupon.value)) / 100)
-      : Number(appliedCoupon.value)
-    : 0;
-  const total = Math.max(0, cartSubtotal + shipping - discount);
+  const [form, setForm] = useState(initialForm);
+  const [paymentMethod, setPaymentMethod] = useState("cod");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const paymentOptions = useMemo(() => {
-    const opts = [];
-    if (checkout.codEnabled) opts.push({ id: 'cod', label: 'ক্যাশ অন ডেলিভারি', icon: Banknote, hint: 'পণ্য হাতে পেয়ে টাকা দিন' });
-    if (checkout.bkashEnabled) opts.push({ id: 'bkash', label: 'বিকাশ', icon: Wallet, hint: checkout.bkashNumber ? `পেমেন্ট নম্বর: ${checkout.bkashNumber}` : '' });
-    if (checkout.nagadEnabled) opts.push({ id: 'nagad', label: 'নগদ', icon: Wallet, hint: checkout.nagadNumber ? `পেমেন্ট নম্বর: ${checkout.nagadNumber}` : '' });
-    if (checkout.rocketEnabled) opts.push({ id: 'rocket', label: 'রকেট', icon: Wallet, hint: checkout.rocketNumber ? `পেমেন্ট নম্বর: ${checkout.rocketNumber}` : '' });
-    opts.push({ id: 'card', label: 'কার্ড / অনলাইন', icon: CreditCard, hint: 'ভিসা / মাস্টারকার্ড' });
-    return opts;
-  }, [checkout]);
+  const subtotal = useMemo(() => {
+    return cart.reduce(
+      (total, item) =>
+        total +
+        Number(item.price || 0) * Number(item.qty || 1),
+      0
+    );
+  }, [cart]);
 
-  const applyCoupon = () => {
-    const code = coupon.trim().toUpperCase();
-    if (!code) return;
-    const list = localdb.listCoupons();
-    const found = list.find((c) => (c.code || '').toUpperCase() === code);
-    if (!found) {
-      toast.error('কুপন কোডটি সঠিক নয়');
-      return;
-    }
-    if (found.min_order && cartSubtotal < Number(found.min_order)) {
-      toast.error(`এই কুপনের জন্য কমপক্ষে ${money(found.min_order)} কেনাকাটা করতে হবে`);
-      return;
-    }
-    setAppliedCoupon(found);
-    toast.success('কুপন প্রয়োগ হয়েছে');
+  const shipping = cart.length > 0 ? SHIPPING_CHARGE : 0;
+  const discount = 0;
+  const total = subtotal + shipping - discount;
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    setForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
+
+    setError("");
   };
 
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!form.name.trim()) { toast.error('নাম দিন'); return; }
-    if (!/^01[3-9]\d{8}$/.test(form.phone.trim())) { toast.error('সঠিক মোবাইল নম্বর দিন (১১ ডিজিট)'); return; }
-    if (!form.address.trim()) { toast.error('ঠিকানা দিন'); return; }
-    if (cart.length === 0) { toast.error('কার্ট খালি'); return; }
+  const validateForm = () => {
+    if (!form.customer_name.trim()) {
+      return "আপনার নাম লিখুন।";
+    }
 
-    setSubmitting(true);
+    const phone = form.customer_phone.replace(/\D/g, "");
+
+    if (!/^01[3-9]\d{8}$/.test(phone)) {
+      return "সঠিক ১১ সংখ্যার বাংলাদেশি মোবাইল নম্বর লিখুন।";
+    }
+
+    if (!form.customer_address.trim()) {
+      return "সম্পূর্ণ ডেলিভারি ঠিকানা লিখুন।";
+    }
+
+    if (!cart.length) {
+      return "আপনার কার্ট খালি। আগে পণ্য যোগ করুন।";
+    }
+
+    for (const item of cart) {
+      if (
+        !item.id ||
+        !item.name ||
+        Number(item.price) < 0 ||
+        Number(item.qty) < 1
+      ) {
+        return "কার্টে একটি পণ্যের তথ্য সঠিক নেই।";
+      }
+    }
+
+    return "";
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (loading) return;
+
+    const validationError = validateForm();
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    if (typeof placeOrder !== "function") {
+      setError("অর্ডার সিস্টেম প্রস্তুত নয়। StoreContext পরীক্ষা করুন।");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
     try {
-      const order = {
-        order_code: localdb.nextOrderCode(),
-        customer_name: form.name.trim(),
-        customer_phone: form.phone.trim(),
-        customer_email: form.email.trim(),
-        customer_address: `${form.address.trim()}, ${form.city}`,
-        city: form.city,
-        note: form.note.trim(),
-        items: cart.map((i) => ({
-          product_id: i.id,
-          name: i.name,
-          slug: i.slug,
-          price: Number(i.price),
-          qty: Number(i.qty),
-          variant: i.variant || '',
-          image: i.image,
+      const orderCode = createOrderCode();
+
+      const orderData = {
+        order_code: orderCode,
+
+        customer_name: form.customer_name.trim(),
+
+        customer_phone: form.customer_phone
+          .replace(/\D/g, ""),
+
+        customer_address: form.customer_address.trim(),
+
+        items: cart.map((item) => ({
+          id: item.id,
+          name: item.name,
+          slug: item.slug || "",
+          price: Number(item.price || 0),
+          qty: Number(item.qty || 1),
+          variant: item.variant || "",
+          image: item.image || "",
         })),
-        subtotal: cartSubtotal,
-        shipping,
-        discount,
-        coupon_code: appliedCoupon?.code || '',
-        total,
-        payment_method: payment,
-        status: 'new',
+
+        subtotal: Number(subtotal),
+        shipping: Number(shipping),
+        discount: Number(discount),
+
+        coupon_code: "",
+
+        total: Number(total),
+
+        payment_method: paymentMethod,
+
+        status: "new",
+
+        note: form.note.trim(),
       };
 
-      const saved = await placeOrder(order);
+      const saved = await placeOrder(orderData);
+
+      if (!saved) {
+        throw new Error("অর্ডার সংরক্ষণ করা যায়নি।");
+      }
+
+      const savedOrderCode =
+        saved.order_code || orderCode;
+
       clearCart();
-      toast.success('অর্ডার সফল হয়েছে!');
-      navigate(`/order-success/${saved.order_code}`, { state: { order: saved } });
+
+      navigate(`/order-success/${savedOrderCode}`, {
+        replace: true,
+        state: {
+          order: {
+            ...orderData,
+            ...saved,
+            order_code: savedOrderCode,
+          },
+        },
+      });
+
     } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error(err);
-      toast.error('অর্ডার করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+      console.error("Checkout error:", err);
+
+      setError(
+        err?.message ||
+        "অর্ডার সম্পন্ন হয়নি। আবার চেষ্টা করুন।"
+      );
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
 
-  if (cart.length === 0) {
+  if (!cart.length) {
     return (
-      <div className="container-x py-24 text-center">
-        <Seo title="চেকআউট — ইম্পোটেক" />
-        <h1 className="text-2xl font-semibold">কার্ট খালি</h1>
-        <p className="text-ink-muted mt-2">চেকআউট করতে আগে পণ্য যোগ করুন।</p>
-        <Link to="/shop" className="btn-primary mt-6">কেনাকাটা করুন</Link>
+      <div className="min-h-[60vh] flex flex-col items-center justify-center px-4 text-center">
+        <div className="text-6xl mb-4">🛒</div>
+
+        <h2 className="text-2xl font-bold mb-2">
+          আপনার কার্ট খালি
+        </h2>
+
+        <p className="text-gray-500 mb-6">
+          অর্ডার করার জন্য আগে পণ্য কার্টে যোগ করুন।
+        </p>
+
+        <button
+          type="button"
+          onClick={() => navigate("/shop")}
+          className="bg-black text-white px-6 py-3 rounded-lg font-semibold"
+        >
+          শপিং শুরু করুন
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="container-x py-8">
-      <Seo title="চেকআউট — ইম্পোটেক" />
-      <h1 className="text-2xl font-semibold mb-6">চেকআউট</h1>
+    <div className="max-w-6xl mx-auto px-4 py-10">
 
-      <form onSubmit={submit} className="grid lg:grid-cols-[1fr_380px] gap-6">
-        <div className="space-y-5">
-          {/* ডেলিভারি তথ্য */}
-          <div className="card p-6">
-            <h2 className="font-semibold mb-4 flex items-center gap-2">
-              <Truck size={18} className="text-accent" /> ডেলিভারি তথ্য
-            </h2>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <label className="label">পূর্ণ নাম *</label>
-                <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="আপনার নাম" />
-              </div>
-              <div>
-                <label className="label">মোবাইল নম্বর *</label>
-                <input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="01XXXXXXXXX" inputMode="numeric" />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="label">ইমেইল (ঐচ্ছিক)</label>
-                <input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="label">সম্পূর্ণ ঠিকানা *</label>
-                <textarea className="input min-h-[80px]" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="বাসা/রোড/এলাকা" />
-              </div>
-              <div>
-                <label className="label">জেলা / শহর</label>
-                <input className="input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-              </div>
-              <div>
-                <label className="label">অর্ডার নোট (ঐচ্ছিক)</label>
-                <input className="input" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="বিশেষ নির্দেশনা" />
-              </div>
-            </div>
-          </div>
+      <h1 className="text-3xl font-bold mb-2">
+        Checkout
+      </h1>
 
-          {/* পেমেন্ট */}
-          <div className="card p-6">
-            <h2 className="font-semibold mb-4 flex items-center gap-2">
-              <CreditCard size={18} className="text-accent" /> পেমেন্ট পদ্ধতি
-            </h2>
-            <div className="space-y-2.5">
-              {paymentOptions.map((opt) => (
-                <label
-                  key={opt.id}
-                  className={`flex items-center gap-3 p-4 rounded-field border cursor-pointer transition-colors ${
-                    payment === opt.id ? 'border-accent bg-accent/5' : 'border-line hover:border-accent/40'
-                  }`}
-                >
+      <p className="text-gray-500 mb-8">
+        আপনার ডেলিভারি তথ্য দিয়ে অর্ডার সম্পন্ন করুন।
+      </p>
+
+      <form onSubmit={handleSubmit}>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+          {/* Customer Information */}
+
+          <div className="lg:col-span-2 space-y-6">
+
+            <div className="bg-white border rounded-xl p-6">
+
+              <h2 className="text-xl font-bold mb-5">
+                ডেলিভারি তথ্য
+              </h2>
+
+              <div className="space-y-4">
+
+                <div>
+                  <label className="block font-medium mb-2">
+                    আপনার নাম *
+                  </label>
+
                   <input
-                    type="radio"
-                    name="payment"
-                    value={opt.id}
-                    checked={payment === opt.id}
-                    onChange={() => setPayment(opt.id)}
-                    className="accent-accent"
+                    type="text"
+                    name="customer_name"
+                    value={form.customer_name}
+                    onChange={handleChange}
+                    placeholder="সম্পূর্ণ নাম লিখুন"
+                    autoComplete="name"
+                    required
+                    className="w-full border rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-black"
                   />
-                  <opt.icon size={18} className="text-accent" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{opt.label}</p>
-                    {opt.hint && <p className="text-xs text-ink-muted mt-0.5">{opt.hint}</p>}
+                </div>
+
+                <div>
+                  <label className="block font-medium mb-2">
+                    মোবাইল নম্বর *
+                  </label>
+
+                  <input
+                    type="tel"
+                    name="customer_phone"
+                    value={form.customer_phone}
+                    onChange={handleChange}
+                    placeholder="01XXXXXXXXX"
+                    autoComplete="tel"
+                    inputMode="numeric"
+                    maxLength={11}
+                    required
+                    className="w-full border rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-black"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-medium mb-2">
+                    সম্পূর্ণ ঠিকানা *
+                  </label>
+
+                  <textarea
+                    name="customer_address"
+                    value={form.customer_address}
+                    onChange={handleChange}
+                    placeholder="বাসা, রোড, এলাকা, থানা, জেলা লিখুন"
+                    autoComplete="street-address"
+                    rows={4}
+                    required
+                    className="w-full border rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-black resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-medium mb-2">
+                    অতিরিক্ত নোট (ঐচ্ছিক)
+                  </label>
+
+                  <textarea
+                    name="note"
+                    value={form.note}
+                    onChange={handleChange}
+                    placeholder="অর্ডার সম্পর্কে কোনো নির্দেশনা থাকলে লিখুন"
+                    rows={3}
+                    className="w-full border rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-black resize-none"
+                  />
+                </div>
+
+              </div>
+            </div>
+
+            {/* Payment Method */}
+
+            <div className="bg-white border rounded-xl p-6">
+
+              <h2 className="text-xl font-bold mb-5">
+                পেমেন্ট পদ্ধতি
+              </h2>
+
+              <label className="flex items-center gap-3 border rounded-lg p-4 cursor-pointer">
+                <input
+                  type="radio"
+                  name="payment"
+                  value="cod"
+                  checked={paymentMethod === "cod"}
+                  onChange={(e) =>
+                    setPaymentMethod(e.target.value)
+                  }
+                  className="w-5 h-5"
+                />
+
+                <div>
+                  <p className="font-semibold">
+                    Cash on Delivery (COD)
+                  </p>
+
+                  <p className="text-sm text-gray-500">
+                    পণ্য হাতে পাওয়ার পর টাকা পরিশোধ করুন।
+                  </p>
+                </div>
+              </label>
+
+            </div>
+
+          </div>
+
+          {/* Order Summary */}
+
+          <div className="lg:col-span-1">
+
+            <div className="bg-white border rounded-xl p-6 sticky top-5">
+
+              <h2 className="text-xl font-bold mb-5">
+                আপনার অর্ডার
+              </h2>
+
+              <div className="space-y-4 mb-5">
+
+                {cart.map((item, index) => (
+                  <div
+                    key={item.id || index}
+                    className="flex gap-3 items-center"
+                  >
+
+                    {item.image ? (
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        className="w-16 h-16 object-cover rounded-lg border"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center">
+                        🏍️
+                      </div>
+                    )}
+
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium line-clamp-2">
+                        {item.name}
+                      </p>
+
+                      {item.variant && (
+                        <p className="text-xs text-gray-500">
+                          {item.variant}
+                        </p>
+                      )}
+
+                      <p className="text-sm text-gray-500">
+                        {money(item.price)} × {item.qty}
+                      </p>
+                    </div>
+
+                    <p className="font-semibold whitespace-nowrap">
+                      {money(
+                        Number(item.price || 0) *
+                        Number(item.qty || 1)
+                      )}
+                    </p>
+
                   </div>
-                  {payment === opt.id && <Check size={18} className="text-accent" />}
-                </label>
-              ))}
+                ))}
+
+              </div>
+
+              <hr />
+
+              <div className="space-y-3 py-5">
+
+                <div className="flex justify-between">
+                  <span className="text-gray-600">
+                    Subtotal
+                  </span>
+
+                  <span className="font-medium">
+                    {money(subtotal)}
+                  </span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-gray-600">
+                    Delivery Charge
+                  </span>
+
+                  <span className="font-medium">
+                    {money(shipping)}
+                  </span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-gray-600">
+                    Discount
+                  </span>
+
+                  <span className="text-green-600 font-medium">
+                    -{money(discount)}
+                  </span>
+                </div>
+
+                <hr />
+
+                <div className="flex justify-between text-lg font-bold">
+                  <span>Total</span>
+
+                  <span>
+                    {money(total)}
+                  </span>
+                </div>
+
+              </div>
+
+              {error && (
+                <div
+                  role="alert"
+                  className="bg-red-50 text-red-600 border border-red-200 rounded-lg p-3 text-sm mb-4"
+                >
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading || !cart.length}
+                className="w-full bg-black hover:bg-gray-800 disabled:bg-gray-400 text-white py-4 rounded-lg font-bold transition"
+              >
+                {loading
+                  ? "অর্ডার প্রসেস হচ্ছে..."
+                  : "অর্ডার কনফার্ম করুন"}
+              </button>
+
+              <p className="text-xs text-center text-gray-500 mt-4">
+                আপনার অর্ডারের তথ্য নিরাপদে সংরক্ষণ করা হবে।
+              </p>
+
             </div>
-            {checkout.paymentNote && (
-              <p className="text-xs text-ink-muted mt-4 bg-surface2 rounded-field p-3">{checkout.paymentNote}</p>
-            )}
+
           </div>
+
         </div>
 
-        {/* সারাংশ */}
-        <div className="card p-6 h-fit lg:sticky lg:top-24">
-          <h2 className="font-semibold mb-4">অর্ডার সারাংশ</h2>
-
-          <div className="space-y-3 max-h-56 overflow-y-auto mb-4">
-            {cart.map((i) => (
-              <div key={i.key} className="flex gap-3 text-sm">
-                <div className="w-12 h-12 rounded-field overflow-hidden bg-surface2 shrink-0">
-                  <img src={i.image} alt={i.name} className="w-full h-full object-cover" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="clamp-2 leading-snug">{i.name}</p>
-                  <p className="text-xs text-ink-muted">{toBn(i.qty)} × {money(i.price)}</p>
-                </div>
-                <p className="font-medium">{money(Number(i.price) * Number(i.qty))}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* কুপন */}
-          <div className="flex gap-2 mb-4">
-            <div className="relative flex-1">
-              <Tag size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
-              <input
-                className="input pl-9"
-                placeholder="কুপন কোড"
-                value={coupon}
-                onChange={(e) => setCoupon(e.target.value)}
-              />
-            </div>
-            <button type="button" className="btn-outline shrink-0" onClick={applyCoupon}>প্রয়োগ</button>
-          </div>
-
-          <div className="space-y-3 text-sm border-t border-line pt-4">
-            <div className="flex justify-between">
-              <span className="text-ink-muted">সাবটোটাল</span>
-              <span>{money(cartSubtotal)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-ink-muted">ডেলিভারি চার্জ</span>
-              <span>{shipping === 0 ? <span className="text-emerald-400">ফ্রি</span> : money(shipping)}</span>
-            </div>
-            {discount > 0 && (
-              <div className="flex justify-between text-emerald-400">
-                <span>ডিসকাউন্ট ({appliedCoupon?.code})</span>
-                <span>-{money(discount)}</span>
-              </div>
-            )}
-            <div className="border-t border-line pt-3 flex justify-between text-base font-semibold">
-              <span>সর্বমোট</span>
-              <span className="text-accent">{money(total)}</span>
-            </div>
-          </div>
-
-          <button type="submit" className="btn-primary w-full mt-5" disabled={submitting}>
-            {submitting ? 'অর্ডার হচ্ছে…' : 'অর্ডার নিশ্চিত করুন'}
-          </button>
-          <p className="text-xs text-ink-muted text-center mt-3">
-            অর্ডার করলে আপনি আমাদের শর্তাবলী মেনে নিচ্ছেন।
-          </p>
-        </div>
       </form>
+
     </div>
   );
 }

@@ -1,19 +1,35 @@
+
 /**
  * StoreContext.jsx — সাইটের কেন্দ্রীয় ডেটা লেয়ার
  * ------------------------------------------------------------
- * - Supabase কনফিগার থাকলে আসল ডেটাবেস থেকে পড়ে (অ্যাডমিনের সাথে শেয়ারড)
+ * - Supabase কনফিগার থাকলে আসল ডেটাবেস থেকে পড়ে
  * - না থাকলে localdb (localStorage) ডেমো মোড
  * - কার্ট, উইশলিস্ট, কাস্টমার অ্যাকাউন্ট — সব এক জায়গায়
+ * - অর্ডার Supabase-এ INSERT করবে SELECT ছাড়াই
  */
 
-import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase.js';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useCallback,
+} from 'react';
+
+import {
+  supabase,
+  isSupabaseConfigured,
+} from '../lib/supabase.js';
+
 import { localdb } from '../lib/localdb.js';
 import * as cartLib from '../lib/cart.js';
 
 const StoreContext = createContext(null);
 
 const AUTH_KEY = 'impotech_customer_v1';
+
+/* ---------- কাস্টমার লগইন ডেটা ---------- */
 
 function readAuth() {
   try {
@@ -24,40 +40,88 @@ function readAuth() {
   }
 }
 
+/* ---------- Store Provider ---------- */
+
 export function StoreProvider({ children }) {
   const [loading, setLoading] = useState(true);
+
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [services, setServices] = useState([]);
   const [faqs, setFaqs] = useState([]);
   const [policies, setPolicies] = useState([]);
   const [settings, setSettings] = useState({});
+
   const [cart, setCart] = useState([]);
   const [wishlist, setWishlist] = useState([]);
-  const [customer, setCustomer] = useState(readAuth());
+
+  const [customer, setCustomer] = useState(readAuth);
 
   /* ---------- ডেটা লোড ---------- */
+
   const loadAll = useCallback(async () => {
     setLoading(true);
+
     try {
       if (isSupabaseConfigured) {
         const [p, c, s, f, pol, st] = await Promise.all([
-          supabase.from('products').select('*').eq('active', true).order('created_at', { ascending: false }),
-          supabase.from('categories').select('*').eq('active', true).order('sort_order'),
-          supabase.from('services').select('*').eq('status', 'active').order('sort_order'),
-          supabase.from('faqs').select('*').eq('active', true).order('sort_order'),
-          supabase.from('policies').select('*').eq('active', true),
-          supabase.from('site_settings').select('*'),
+          supabase
+            .from('products')
+            .select('*')
+            .eq('active', true)
+            .order('created_at', { ascending: false }),
+
+          supabase
+            .from('categories')
+            .select('*')
+            .eq('active', true)
+            .order('sort_order'),
+
+          supabase
+            .from('services')
+            .select('*')
+            .eq('status', 'active')
+            .order('sort_order'),
+
+          supabase
+            .from('faqs')
+            .select('*')
+            .eq('active', true)
+            .order('sort_order'),
+
+          supabase
+            .from('policies')
+            .select('*')
+            .eq('active', true),
+
+          supabase
+            .from('site_settings')
+            .select('*'),
         ]);
+
+        // Supabase query error থাকলে fallback
+        const results = [p, c, s, f, pol, st];
+        const failed = results.find((result) => result.error);
+
+        if (failed) {
+          throw failed.error;
+        }
+
         setProducts(p.data || []);
         setCategories(c.data || []);
         setServices(s.data || []);
         setFaqs(f.data || []);
         setPolicies(pol.data || []);
+
         const map = {};
-        (st.data || []).forEach((row) => { map[row.key] = row.value; });
+
+        (st.data || []).forEach((row) => {
+          map[row.key] = row.value;
+        });
+
         setSettings(map);
       } else {
+        // Demo mode
         setProducts(localdb.listProducts());
         setCategories(localdb.listCategories());
         setServices(localdb.listServices());
@@ -66,8 +130,8 @@ export function StoreProvider({ children }) {
         setSettings(localdb.getAllSettings());
       }
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error('store load failed, falling back to demo', e);
+      console.error('Store load failed, falling back to demo:', e);
+
       setProducts(localdb.listProducts());
       setCategories(localdb.listCategories());
       setServices(localdb.listServices());
@@ -81,9 +145,12 @@ export function StoreProvider({ children }) {
     }
   }, []);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
 
   /* ---------- কার্ট ---------- */
+
   const addToCart = useCallback((product, qty = 1, variant = '') => {
     const next = cartLib.addToCart(product, qty, variant);
     setCart([...next]);
@@ -106,6 +173,7 @@ export function StoreProvider({ children }) {
   }, []);
 
   /* ---------- উইশলিস্ট ---------- */
+
   const toggleWishlist = useCallback((product) => {
     const next = cartLib.toggleWishlist(product);
     setWishlist([...next]);
@@ -117,11 +185,19 @@ export function StoreProvider({ children }) {
     setWishlist([...next]);
   }, []);
 
-  /* ---------- অ্যাকাউন্ট (ডেমো) ---------- */
+  /* ---------- কাস্টমার অ্যাকাউন্ট ---------- */
+
   const login = useCallback((data) => {
-    const rec = { name: data.name || '', phone: data.phone || '', email: data.email || '', at: new Date().toISOString() };
+    const rec = {
+      name: data.name || '',
+      phone: data.phone || '',
+      email: data.email || '',
+      at: new Date().toISOString(),
+    };
+
     localStorage.setItem(AUTH_KEY, JSON.stringify(rec));
     setCustomer(rec);
+
     return rec;
   }, []);
 
@@ -131,80 +207,146 @@ export function StoreProvider({ children }) {
   }, []);
 
   /* ---------- অর্ডার ---------- */
+
   const placeOrder = useCallback(async (order) => {
     if (isSupabaseConfigured) {
-      const { data, error } = await supabase.from('orders').insert(order).select().single();
-      if (error) throw error;
-      return data;
+      // Supabase-এ শুধু INSERT করা হচ্ছে।
+      // SELECT permission লাগবে না।
+      const { error } = await supabase
+        .from('orders')
+        .insert(order);
+
+      if (error) {
+        console.error('Supabase order insert failed:', error);
+        throw error;
+      }
+
+      // INSERT সফল হলে Checkout-কে order data ফেরত দেবে।
+      return order;
     }
+
+    // Demo mode
     return localdb.placeOrder(order);
   }, []);
 
+  /* ---------- অর্ডার খোঁজা ---------- */
+
   const findOrder = useCallback(async (code, phone) => {
     if (isSupabaseConfigured) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('orders')
         .select('*')
         .eq('order_code', code)
         .eq('customer_phone', phone)
         .maybeSingle();
+
+      if (error) {
+        console.error('Find order failed:', error);
+        throw error;
+      }
+
       return data || null;
     }
+
     return localdb.findOrder(code, phone);
   }, []);
 
+  /* ---------- ফোন নম্বর দিয়ে অর্ডার লিস্ট ---------- */
+
   const listOrdersByPhone = useCallback(async (phone) => {
     if (isSupabaseConfigured) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('orders')
         .select('*')
         .eq('customer_phone', phone)
         .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Load customer orders failed:', error);
+        throw error;
+      }
+
       return data || [];
     }
+
     return localdb.listOrdersByPhone(phone);
   }, []);
 
-  /* ---------- ডেরাইভড ---------- */
-  const cartCount = useMemo(() => cart.reduce((s, i) => s + Number(i.qty || 0), 0), [cart]);
-  const cartSubtotal = useMemo(
-    () => cart.reduce((s, i) => s + Number(i.price || 0) * Number(i.qty || 0), 0),
+  /* ---------- ডেরাইভড ডেটা ---------- */
+
+  const cartCount = useMemo(
+    () => cart.reduce(
+      (sum, item) => sum + Number(item.qty || 0),
+      0
+    ),
     [cart]
   );
 
+  const cartSubtotal = useMemo(
+    () => cart.reduce(
+      (sum, item) =>
+        sum + Number(item.price || 0) * Number(item.qty || 0),
+      0
+    ),
+    [cart]
+  );
+
+  /* ---------- Provider Value ---------- */
+
   const value = {
     loading,
+
     products,
     categories,
     services,
     faqs,
     policies,
     settings,
+
     cart,
     cartCount,
     cartSubtotal,
+
     wishlist,
     customer,
+
     isSupabaseConfigured,
+
     reload: loadAll,
+
     addToCart,
     updateQty,
     removeFromCart,
     clearCart,
+
     toggleWishlist,
     removeFromWishlist,
+
     login,
     logout,
+
     placeOrder,
     findOrder,
     listOrdersByPhone,
   };
 
-  return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
+  return (
+    <StoreContext.Provider value={value}>
+      {children}
+    </StoreContext.Provider>
+  );
 }
+
+/* ---------- useStore Hook ---------- */
 
 export function useStore() {
   const ctx = useContext(StoreContext);
-  if (!ctx) throw new Error('useStore must be used within StoreProvider');
+
+  if (!ctx) {
+    throw new Error(
+      'useStore must be used within StoreProvider'
+    );
+  }
+
   return ctx;
 }

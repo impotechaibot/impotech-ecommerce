@@ -1,5 +1,4 @@
 import { useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
 import { useSiteConfig, hexToRgb, darken } from '../hooks/useSiteConfig.js';
 
 /* ==========================================================
@@ -7,6 +6,25 @@ import { useSiteConfig, hexToRgb, darken } from '../hooks/useSiteConfig.js';
    font scale, corner radius, dark/light mode) as CSS variables
    on :root. The background feature (useBackground) is untouched;
    this only overrides the accent + a few sizing tokens.
+
+   v21 — অপরিবর্তিত (v20-এর ফিক্সই ঠিক আছে)।
+   ----------------------------------------------------------
+   আগে এই কম্পোনেন্টটা `useLocation()` দিয়ে রুট বদলালে
+   re-render হতো, কিন্তু `useSiteConfig()`-এর `config` স্টেট
+   আপডেট হতো না — কারণ `save()` যে `SITE_EVENT` ছড়ায় সেটা
+   শোনা হতো না। ফলে অ্যাডমিনে সেভ করলে localStorage-এ লেখা
+   হতো, কিন্তু ওয়েবসাইটের এই কম্পোনেন্ট re-render না হওয়ায়
+   CSS ভেরিয়েবলগুলো পুরোনো মানেই থেকে যেত।
+
+   এখন `useSiteConfig()` নিজেই SITE_EVENT শোনে (দেখুন
+   src/hooks/useSiteConfig.js), তাই config বদলালে এই
+   useEffect আবার চলে এবং ভেরিয়েবল সাথে সাথে বসে।
+
+   ⚠️ এই ফাইলে আর `useLocation` import করা হয়নি — কারণ
+   ThemeLayer এখন App.jsx-এর বাইরে main.jsx-এ মাউন্ট হয়,
+   যেখানে Router context নেই। useLocation রাখলে
+   "useLocation() may be used only in the context of a
+   <Router>" এরর হতো।
    ========================================================== */
 
 const ThemeLayer = () => {

@@ -1,78 +1,185 @@
-/* ---------- Product detail ---------- */
-.pd-page .breadcrumb,
-.pd-page .crumbs .crumb-now {
-  color: var(--muted);
+/* ==========================================================
+   ProductDetail.css — ইম্পোটেক প্রোডাক্ট পেজ (v18)
+   ----------------------------------------------------------
+   বসানোর পাথ:  src/styles/ProductDetail.css   (রিপ্লেস)
+
+   মোবাইল-ফার্স্ট। সব রঙ থিম ভেরিয়েবল থেকে:
+     var(--accent) / var(--accent-soft) / var(--accent-dark)
+     var(--bg) / var(--surface) / var(--surface-2)
+     var(--line) / var(--line-strong) / var(--text) / var(--muted)
+   তাই অ্যাডমিন থেকে কালার বদলালে এখানেও বদলায়।
+   ========================================================== */
+
+/* ---------- পেজ শেল ---------- */
+.pd-page {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  /* ডানের কালো ফাঁকা জায়গা বন্ধ */
+  overflow-x: clip;
+}
+
+.pd-wrap {
+  padding-top: 10px;
+  padding-bottom: 96px; /* স্টিকি বারের জন্য জায়গা */
+}
+
+/* ---------- ব্রেডক্রাম্ব ---------- */
+.pd-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 10px;
+  font-size: 11.5px;
+  color: var(--muted-2);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.pd-crumbs a {
+  color: var(--muted-2);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+.pd-crumbs a:hover {
+  color: var(--accent);
+}
+.pd-crumbs svg {
+  flex-shrink: 0;
+  opacity: 0.5;
 }
 .crumb-now {
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  color: var(--muted);
+  min-width: 0;
 }
 
+/* ---------- কার্ড ---------- */
+.pd-card {
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+/* ---------- গ্রিড ---------- */
 .pd-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 40px;
+  grid-template-columns: 1fr;
   align-items: start;
-  margin-bottom: 20px;
 }
 
-/* gallery */
+/* ---------- গ্যালারি ---------- */
+.pd-gallery {
+  min-width: 0;
+}
+
 .pd-main-img {
   position: relative;
-  border-radius: 20px;
+  width: 100%;
+  border-radius: 14px;
   overflow: hidden;
-  border: 1px solid var(--line-strong);
-  background: #0f0f13;
-  aspect-ratio: 1;
-  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
 }
 .pd-main-img img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.6s var(--ease);
-}
-.pd-main-img:hover img {
-  transform: scale(1.04);
-}
-/* Video stage: no hover zoom, the player owns the pointer. */
-.pd-main-video {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  background: #000;
   display: block;
 }
+.pd-noimg {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--muted-2);
+  font-size: 13px;
+}
+
+.pd-zoom {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(10, 10, 12, 0.6);
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+  backdrop-filter: blur(6px);
+}
+
+.pd-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(10, 10, 12, 0.55);
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+  backdrop-filter: blur(6px);
+  opacity: 0.9;
+}
+.pd-nav.prev { left: 8px; }
+.pd-nav.next { right: 8px; }
+
 .pd-discount {
   position: absolute;
-  top: 16px;
-  left: 16px;
-  padding: 5px 12px;
+  top: 10px;
+  left: 10px;
+  padding: 4px 10px;
   border-radius: 999px;
   background: var(--accent);
   color: #14100a;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 800;
+  letter-spacing: 0.2px;
 }
+.pd-out {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(20, 20, 24, 0.9);
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+/* থাম্বনেইল */
 .pd-thumbs {
   display: flex;
-  gap: 10px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 10px;
   overflow-x: auto;
-  padding-bottom: 4px;
-  scrollbar-width: thin;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.pd-thumbs::-webkit-scrollbar {
+  display: none;
 }
 .pd-thumbs button {
   position: relative;
-  width: 74px;
-  height: 74px;
+  width: 58px;
+  height: 58px;
   flex-shrink: 0;
-  border-radius: 12px;
+  border-radius: 10px;
   overflow: hidden;
-  border: 1px solid var(--line);
-  opacity: 0.6;
-  transition: opacity 0.2s var(--ease), border-color 0.2s var(--ease);
+  border: 1.5px solid var(--line);
+  background: var(--surface-2);
+  opacity: 0.62;
+  transition: opacity 0.18s ease, border-color 0.18s ease;
 }
 .pd-thumbs button.on,
 .pd-thumbs button:hover {
@@ -86,138 +193,187 @@
   object-fit: cover;
   display: block;
 }
-/* Play badge on video thumbnails so they read as video, not a still. */
 .pd-thumb-play {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  font-size: 15px;
   color: #fff;
   background: rgba(0, 0, 0, 0.42);
   pointer-events: none;
 }
 
-/* info */
-.pd-tags {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
+/* ---------- তথ্য ---------- */
+.pd-info {
+  min-width: 0;
 }
+
+.pd-cat {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0;
+}
+
+.pd-title {
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  margin: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.pd-en {
+  font-size: 12px;
+  color: var(--muted-2);
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+
+/* রেটিং */
+.pd-rating {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.pd-rating.center {
+  justify-content: center;
+}
+.pd-rating .stars {
+  display: inline-flex;
+  gap: 1.5px;
+  color: var(--accent);
+}
+.pd-rating .stars .off {
+  color: var(--muted-2);
+  opacity: 0.45;
+}
+.pd-rev {
+  font-size: 11.5px;
+  color: var(--muted-2);
+}
+
 .pd-tag {
-  padding: 4px 11px;
+  padding: 3px 9px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--line-strong);
   color: var(--muted);
 }
 .pd-tag.accent {
-  background: var(--accent);
+  background: var(--accent-soft);
   border-color: var(--accent);
-  color: #14100a;
-}
-.pd-info h1 {
-  font-size: 29px;
-  font-weight: 800;
-  line-height: 1.25;
-  letter-spacing: -0.8px;
-  margin-bottom: 6px;
-}
-.pd-en {
-  font-size: 13px;
-  color: var(--muted-2);
-  margin-bottom: 14px;
-}
-.pd-rating {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 18px;
-}
-.pd-rating .stars {
-  display: inline-flex;
-  gap: 2px;
   color: var(--accent);
-}
-.pd-rating .off {
-  color: var(--muted-2);
-}
-.pd-rev {
-  font-size: 12.5px;
-  color: var(--muted-2);
 }
 
+/* দাম */
 .pd-price {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  padding: 16px 0;
+  padding: 12px 0;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
-  margin-bottom: 18px;
 }
 .pd-price b {
-  font-size: 32px;
+  font-size: 26px;
   font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.8px;
   color: var(--accent);
-  letter-spacing: -1px;
 }
 .pd-price s {
-  font-size: 15px;
+  font-size: 13.5px;
   color: var(--muted-2);
 }
 .pd-save {
-  margin-left: auto;
-  padding: 4px 11px;
+  padding: 3px 9px;
   border-radius: 999px;
-  font-size: 11.5px;
-  font-weight: 700;
+  font-size: 10.5px;
+  font-weight: 800;
   background: rgba(52, 211, 153, 0.14);
-  color: var(--green);
+  color: #34d399;
   border: 1px solid rgba(52, 211, 153, 0.3);
 }
 
-.pd-desc {
-  font-size: 14px;
-  line-height: 1.8;
-  color: var(--muted);
-  margin-bottom: 22px;
+/* স্টক */
+.pd-stock {
+  font-size: 12px;
+  font-weight: 600;
+  margin: 0;
+}
+.pd-stock.in { color: #34d399; }
+.pd-stock.low { color: var(--accent); }
+.pd-stock.out { color: #f87171; }
+
+/* ফ্রি ডেলিভারি */
+.pd-free {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  background: rgba(52, 211, 153, 0.1);
+}
+.pd-free svg {
+  color: #34d399;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.pd-free b {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #34d399;
+}
+.pd-free small {
+  display: block;
+  font-size: 10.5px;
+  color: var(--muted-2);
+  margin-top: 1px;
 }
 
+/* বর্ণনা */
+.pd-desc {
+  font-size: 13px;
+  line-height: 1.85;
+  color: var(--muted);
+  margin: 0;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* লেবেল */
 .pd-label {
-  font-size: 11.5px;
+  font-size: 10.5px;
   font-weight: 800;
-  letter-spacing: 1.1px;
+  letter-spacing: 1px;
   text-transform: uppercase;
   color: var(--muted-2);
-  margin-bottom: 10px;
+  margin: 0 0 7px;
 }
-.pd-colors {
-  margin-bottom: 22px;
-}
+
+/* ভ্যারিয়েন্ট */
 .pd-color-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 7px;
 }
 .pd-color-row button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 15px;
+  padding: 7px 13px;
   border-radius: 999px;
   border: 1px solid var(--line-strong);
   background: rgba(255, 255, 255, 0.03);
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--muted);
-  transition: border-color 0.2s var(--ease), color 0.2s var(--ease),
-    background 0.2s var(--ease);
-}
-.pd-color-row button:hover {
-  color: var(--text);
+  transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
 }
 .pd-color-row button.on {
   border-color: var(--accent);
@@ -225,97 +381,239 @@
   background: var(--accent-soft);
 }
 
-.pd-buy {
-  display: flex;
-  align-items: stretch;
-  gap: 10px;
-  margin-bottom: 10px;
-}
+/* পরিমাণ */
 .pd-qty {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   padding: 3px;
-  border-radius: 12px;
+  border-radius: 11px;
   border: 1px solid var(--line-strong);
   background: rgba(255, 255, 255, 0.03);
 }
 .pd-qty button {
-  width: 34px;
+  width: 36px;
   height: 38px;
-  border-radius: 9px;
+  border-radius: 8px;
   display: grid;
   place-items: center;
   color: var(--muted);
-  transition: background 0.18s var(--ease), color 0.18s var(--ease);
+  transition: background 0.16s ease, color 0.16s ease;
 }
 .pd-qty button:hover {
   background: rgba(255, 255, 255, 0.08);
   color: var(--text);
 }
 .pd-qty span {
-  min-width: 34px;
+  min-width: 36px;
   text-align: center;
   font-size: 14px;
   font-weight: 700;
 }
+
+/* ---------- বাটন ---------- */
+.pd-buy {
+  align-items: stretch;
+}
+.pd-add,
+.pd-buynow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 48px;
+  border-radius: 11px;
+  font-size: 14px;
+  font-weight: 700;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.1s ease;
+}
 .pd-add {
   flex: 1;
-  border-radius: 12px;
+  min-width: 0;
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+.pd-add:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.pd-buynow {
+  flex: 1;
+  min-width: 0;
+  background: var(--accent);
+  color: #14100a;
+  border: 1px solid var(--accent);
+}
+.pd-buynow:hover {
+  background: var(--accent-dark);
+  border-color: var(--accent-dark);
+}
+.pd-add:active,
+.pd-buynow:active {
+  transform: scale(0.985);
 }
 .pd-wish {
-  width: 50px;
-  border-radius: 12px;
-  border: 1px solid var(--line-strong);
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
   display: grid;
   place-items: center;
+  border-radius: 11px;
+  border: 1px solid var(--line-strong);
   color: var(--muted);
-  transition: color 0.2s var(--ease), border-color 0.2s var(--ease),
-    background 0.2s var(--ease);
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
 }
 .pd-wish:hover,
 .pd-wish.on {
-  color: var(--red);
+  color: #f87171;
   border-color: rgba(248, 113, 113, 0.5);
   background: rgba(248, 113, 113, 0.1);
 }
-.pd-buynow {
-  width: 100%;
-  margin-bottom: 22px;
+
+/* WhatsApp / কল */
+.pd-contact {
+  display: flex;
+  gap: 8px;
+}
+.pd-wa,
+.pd-call {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 42px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.pd-wa {
+  background: #25d366;
+  color: #062b14;
+}
+.pd-call {
+  border: 1px solid var(--line-strong);
+  color: var(--muted);
+}
+.pd-call:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
+/* সুবিধা */
 .pd-perks {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 16px;
-  border-radius: 14px;
+  gap: 9px;
+  padding: 12px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.025);
   border: 1px solid var(--line);
 }
-.pd-perks div {
+.pd-perks > div {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 12.8px;
-  color: var(--muted);
+  gap: 9px;
 }
 .pd-perks svg {
   color: var(--accent);
   flex-shrink: 0;
 }
+.pd-perks b {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.pd-perks small {
+  display: block;
+  font-size: 10.5px;
+  color: var(--muted-2);
+}
 
-/* tabs */
+/* ---------- বান্ডেল ---------- */
+.pd-bundle h2 {
+  font-size: 13.5px;
+  font-weight: 700;
+  margin: 0 0 10px;
+}
+.pd-bundle-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+}
+.pd-bundle-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.pd-bundle-img {
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.pd-bundle-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pd-bundle-item p {
+  font-size: 11.5px;
+  font-weight: 600;
+  margin: 0;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pd-bundle-item small {
+  font-size: 11px;
+  color: var(--muted-2);
+}
+.pd-op {
+  font-size: 15px;
+  color: var(--muted-2);
+  opacity: 0.6;
+}
+.pd-bundle-total {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.pd-bundle-total b {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--accent);
+}
+.pd-bundle-total button {
+  height: 34px;
+  padding: 0 13px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #14100a;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+/* ---------- ট্যাব ---------- */
 .pd-tabs {
-  margin: 36px 0 20px;
-  border-radius: 18px;
+  border-radius: 16px;
   border: 1px solid var(--line);
   background: var(--surface);
   overflow: hidden;
 }
 .pd-tab-head {
   display: flex;
-  gap: 4px;
-  padding: 8px;
+  gap: 2px;
+  padding: 6px;
   border-bottom: 1px solid var(--line);
   overflow-x: auto;
   scrollbar-width: none;
@@ -324,76 +622,91 @@
   display: none;
 }
 .pd-tab-head button {
-  padding: 9px 18px;
-  border-radius: 10px;
-  font-size: 13.5px;
+  flex: 1;
+  padding: 9px 8px;
+  border-radius: 9px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--muted);
   white-space: nowrap;
-  transition: background 0.2s var(--ease), color 0.2s var(--ease);
+  transition: background 0.18s ease, color 0.18s ease;
 }
 .pd-tab-head button.on {
   background: var(--accent-soft);
   color: var(--accent);
 }
+
 .pd-tab-body {
-  padding: 22px 24px;
-  font-size: 13.8px;
+  padding: 14px;
+  font-size: 13px;
   line-height: 1.85;
   color: var(--muted);
 }
+
+.pd-desc-body h3 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 8px;
+}
+.pd-desc-body h3 + * {
+  margin-bottom: 16px;
+}
+.pd-long {
+  margin: 0 0 16px;
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
 .pd-feat-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px;
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px 24px;
+  grid-template-columns: 1fr;
+  gap: 8px;
 }
 .pd-feat-list li {
   display: flex;
-  align-items: center;
-  gap: 9px;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.7;
 }
 .pd-feat-list svg {
-  color: var(--green);
+  color: #34d399;
   flex-shrink: 0;
+  margin-top: 3px;
+}
+.pd-tagline {
+  font-size: 11px;
+  color: var(--muted-2);
+  margin: 0;
 }
 
-@media (max-width: 900px) {
-  .pd-grid {
-    grid-template-columns: 1fr;
-    gap: 24px;
-  }
-  .pd-info h1 {
-    font-size: 21px;
-  }
-  .pd-price b {
-    font-size: 26px;
-  }
-  .pd-thumbs button {
-    width: 62px;
-    height: 62px;
-  }
-  .pd-feat-list {
-    grid-template-columns: 1fr;
-  }
-  .pd-tab-body {
-    padding: 18px;
-  }
-  .pd-buy {
-    flex-wrap: wrap;
-  }
-  .pd-add {
-    min-width: 0;
-  }
+/* ভিডিও */
+.pd-video-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
 }
-
-/* Mute / unmute control shown when a product has video autoplay enabled. */
+.pd-main-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
 .pd-mute {
   position: absolute;
-  right: 14px;
-  bottom: 14px;
+  right: 10px;
+  bottom: 10px;
   z-index: 3;
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -401,10 +714,402 @@
   border: 1px solid var(--line-strong);
   color: var(--text);
   backdrop-filter: blur(8px);
-  transition: background 0.2s var(--ease), transform 0.2s var(--ease);
 }
 .pd-mute:hover {
   background: var(--accent);
   color: #14100a;
-  transform: scale(1.06);
+}
+.pd-vthumbs button {
+  width: 76px;
+  height: 50px;
+}
+.pd-empty {
+  padding: 28px 16px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--muted-2);
+  border-radius: 10px;
+  border: 1px dashed var(--line-strong);
+}
+
+/* রিভিউ */
+.pd-rev-sum {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.pd-rev-score {
+  text-align: center;
+}
+.pd-rev-score b {
+  display: block;
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--text);
+}
+.pd-rev-score .stars {
+  display: inline-flex;
+  gap: 1.5px;
+  color: var(--accent);
+  margin: 5px 0 3px;
+}
+.pd-rev-score .stars .off {
+  color: var(--muted-2);
+  opacity: 0.45;
+}
+.pd-rev-score small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted-2);
+}
+.pd-rev-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.pd-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.pd-bar-row span {
+  width: 26px;
+  text-align: right;
+  font-size: 10.5px;
+  color: var(--muted-2);
+}
+.pd-bar {
+  flex: 1;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.pd-bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+}
+.pd-bar-row em {
+  width: 20px;
+  font-size: 10.5px;
+  font-style: normal;
+  color: var(--muted-2);
+}
+
+.pd-rev-form {
+  padding-top: 14px;
+}
+.pd-rev-form h3 {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 9px;
+}
+.pd-rev-fields {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+.pd-rev-form input,
+.pd-rev-form select,
+.pd-rev-form textarea {
+  width: 100%;
+  border-radius: 9px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12.5px;
+  font-family: inherit;
+  padding: 10px 11px;
+}
+.pd-rev-form input,
+.pd-rev-form select {
+  height: 42px;
+}
+.pd-rev-form textarea {
+  margin-top: 8px;
+  resize: vertical;
+  line-height: 1.7;
+}
+.pd-rev-form input:focus,
+.pd-rev-form select:focus,
+.pd-rev-form textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.pd-rev-submit {
+  margin-top: 9px;
+  height: 42px;
+  padding: 0 18px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #14100a;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.pd-rev-submit:disabled {
+  opacity: 0.5;
+}
+
+.pd-rev-list {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.pd-rev-item {
+  padding: 12px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+}
+.pd-rev-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+}
+.pd-rev-who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.pd-avatar {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+.pd-rev-who p {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+.pd-rev-who small {
+  font-size: 10px;
+  color: var(--muted-2);
+}
+.pd-rev-head .stars {
+  display: inline-flex;
+  gap: 1px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.pd-rev-head .stars .off {
+  color: var(--muted-2);
+  opacity: 0.45;
+}
+.pd-rev-text {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- সম্পর্কিত ---------- */
+.pd-related-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.pd-related-head h2 {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0;
+}
+.pd-related-head a {
+  font-size: 11.5px;
+  color: var(--accent);
+  text-decoration: none;
+}
+.pd-related-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+/* ---------- স্টিকি বার ---------- */
+.pd-sticky {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px calc(9px + env(safe-area-inset-bottom));
+  background: rgba(12, 12, 15, 0.94);
+  border-top: 1px solid var(--line-strong);
+  backdrop-filter: blur(14px);
+}
+.pd-sticky-price {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex-shrink: 0;
+}
+.pd-sticky-price b {
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--accent);
+  line-height: 1.1;
+}
+.pd-sticky-price s {
+  font-size: 10.5px;
+  color: var(--muted-2);
+}
+.pd-sticky-add,
+.pd-sticky-buy {
+  height: 44px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+.pd-sticky-add {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+}
+.pd-sticky-buy {
+  flex: 0 0 auto;
+  padding: 0 18px;
+  background: var(--accent);
+  color: #14100a;
+}
+
+/* ---------- জুম ---------- */
+.pd-zoom-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.94);
+}
+.pd-zoom-wrap img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.pd-zoom-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+/* ==========================================================
+   ট্যাবলেট / ডেস্কটপ — আগের দুই-কলাম লেআউট
+   ========================================================== */
+@media (min-width: 900px) {
+  .pd-wrap {
+    padding-top: 18px;
+    padding-bottom: 24px;
+  }
+  .pd-crumbs {
+    font-size: 12.5px;
+    margin-bottom: 16px;
+  }
+  .pd-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .pd-main-img {
+    border-radius: 18px;
+  }
+  .pd-thumbs button {
+    width: 72px;
+    height: 72px;
+  }
+  .pd-title {
+    font-size: 27px;
+    letter-spacing: -0.8px;
+  }
+  .pd-price b {
+    font-size: 32px;
+  }
+  .pd-desc {
+    font-size: 13.8px;
+    -webkit-line-clamp: 5;
+  }
+  .pd-add,
+  .pd-buynow,
+  .pd-wish {
+    height: 46px;
+  }
+  .pd-tab-body {
+    padding: 22px 24px;
+    font-size: 13.8px;
+  }
+  .pd-feat-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 24px;
+  }
+  .pd-rev-sum {
+    flex-direction: row;
+    gap: 24px;
+  }
+  .pd-rev-score {
+    text-align: left;
+    width: 150px;
+    flex-shrink: 0;
+  }
+  .pd-rev-bars {
+    flex: 1;
+    max-width: 320px;
+  }
+  .pd-rev-fields {
+    grid-template-columns: 1fr 1fr;
+  }
+  .pd-related-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+  }
+  /* ডেস্কটপে স্টিকি বার দরকার নেই */
+  .pd-sticky {
+    display: none;
+  }
+}
+
+/* ছোট ফোন (≤360px) — আরও টাইট */
+@media (max-width: 360px) {
+  .pd-price b {
+    font-size: 23px;
+  }
+  .pd-add,
+  .pd-buynow {
+    font-size: 12.5px;
+  }
+  .pd-sticky-buy {
+    padding: 0 13px;
+  }
 }

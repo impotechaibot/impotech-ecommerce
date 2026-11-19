@@ -2,8 +2,42 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ==========================================================
+   index.css — v21
+   ----------------------------------------------------------
+   এখানে :root-এ সব থিম টোকেনের ডিফল্ট মান বসানো হয়েছে।
+
+   কেন দরকার: tailwind.config.js এখন `var(--accent)` ইত্যাদি
+   ব্যবহার করে। যদি :root-এ এই ভেরিয়েবলগুলোর কোনো ডিফল্ট না
+   থাকে, তাহলে ThemeLayer চলার আগের প্রথম পেইন্টে রঙ হাওয়া হয়ে
+   যেত (সাদা/কালো ভাঙা)। এই ব্লকটা সেই নিরাপত্তা-জাল।
+
+   অ্যাডমিন থেকে সেভ করলে ThemeLayer (src/components/ThemeLayer.jsx)
+   এই একই ভেরিয়েবলগুলো <html>-এ inline style দিয়ে ওভাররাইড করে।
+   ========================================================== */
+
 :root {
   color-scheme: dark;
+
+  /* ---- ডার্ক (ডিফল্ট) ---- */
+  --bg: #08080a;
+  --surface: rgba(20, 20, 24, 0.88);
+  --surface-solid: #141418;
+  --surface-2: #1b1b20;
+  --line: rgba(255, 255, 255, 0.09);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --text: #f5f5f7;
+  --muted: #9a9aa4;
+  --muted-2: #6e6e78;
+
+  /* ---- অ্যাকসেন্ট ---- */
+  --accent: #f0b429;
+  --accent-dark: #c9920f;
+  --accent-soft: rgba(240, 180, 41, 0.14);
+
+  /* ---- আকৃতি ---- */
+  --radius: 18px;
+  --radius-sm: 12px;
 }
 
 html,
@@ -15,6 +49,15 @@ body,
 body {
   @apply bg-bg text-ink font-sans antialiased;
   margin: 0;
+  /* মোবাইলে ডানে কালো ফাঁকা জায়গা ঠেকায় */
+  overflow-x: clip;
+}
+
+img,
+video,
+svg,
+canvas {
+  max-width: 100%;
 }
 
 /* স্ক্রলবার */
@@ -23,14 +66,14 @@ body {
   height: 10px;
 }
 ::-webkit-scrollbar-track {
-  background: #101014;
+  background: var(--surface-2);
 }
 ::-webkit-scrollbar-thumb {
-  background: #2a2a33;
+  background: var(--line-strong);
   border-radius: 8px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3a3a45;
+  background: var(--muted-2);
 }
 
 @layer components {

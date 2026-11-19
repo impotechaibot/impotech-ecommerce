@@ -1,43 +1,28 @@
 /**
- * ProductDetail.jsx — ইম্পোটেক প্রোডাক্ট পেজ (v14)
+ * ProductDetail.jsx — ইম্পোটেক প্রোডাক্ট পেজ (v18)
  * ------------------------------------------------------------
- * বসানোর পাথ:  website/src/pages/ProductDetail.jsx
+ * বসানোর পাথ:  src/pages/ProductDetail.jsx   (রিপ্লেস)
  *
- * v14 = v13 ডিজাইন (ghorerbazar.com স্টাইল) + যাচাই করে পাওয়া বাগফিক্স
+ * v18 = মোবাইল-ফার্স্ট লেআউট (ghorerbazar.com-এর মতো গোছানো)
+ *       + অ্যাডমিন থেকে বেছে নেওয়া লেআউট ভ্যারিয়েন্ট
+ *       + থিম কালার (var(--accent)) — আর কোনো হার্ডকোড রঙ নেই
  *
- * v13 ডিজাইন:
- *   - লেআউট: ব্রেডক্রাম্ব → সাদা কার্ডে ২ কলাম (বাঁয়ে গ্যালারি, ডানে তথ্য)
- *   - দামের লাইনে কাটা দাম + "সাশ্রয় X%" সবুজ ব্যাজ
- *   - স্টক স্ট্যাটাস ডট সহ
- *   - রঙ/ভ্যারিয়েন্ট → পরিমাণ → দুই পাশাপাশি বাটন (কার্টে যোগ / এখনই কিনুন) + উইশলিস্ট
- *   - WhatsApp-এ অর্ডার + কল করুন সারি
- *   - ৩টি সুবিধা (ডেলিভারি / পেমেন্ট / রিটার্ন)
- *   - "একসাথে বেশি কেনা হয়" বান্ডেল ব্লক
- *   - ট্যাব: বিবরণ | ভিডিও | রিভিউ
- *   - রিভিউ: বড় রেটিং + তারকা + সুপারিশ% + ৫→১ বার গ্রাফ + লেখার ফর্ম + তালিকা
- *   - সম্পর্কিত পণ্য
+ * মোবাইলে যা ঠিক করা হয়েছে:
+ *   ১. ডানের কালো ফাঁকা জায়গা — overflow-x গার্ড (CSS) + min-w-0
+ *   ২. ছবি মোবাইলে কার্ডের কিনারা পর্যন্ত, ১:১ অনুপাত
+ *   ৩. বর্ণনা line-height ১.৮৫, প্যারাগ্রাফে ভাঙা
+ *   ৪. বাটন ৪৮px উঁচু, পুরো প্রস্থ — আঙুলে ঠিক
+ *   ৫. সেকশনে আলাদা কার্ড + শ্যাডো — সব মিশে যায় না
+ *   ৬. ট্যাব মোবাইলে সমান ভাগে
+ *   ৭. নিচে ভাসমান কার্ট বার (অ্যাডমিন থেকে বন্ধ করা যায়)
+ *   ৮. ফন্ট সাইজ ও স্পেসিং স্কেল — ছোট স্ক্রিনে চাপাচাপি নেই
  *
- * v14-এ ঠিক করা হয়েছে (v13-এর বাগ):
- *   1. settings?.general?.phone → settings?.contact?.phone
- *      (StoreContext-এ ফোন নম্বর থাকে settings.contact.phone-এ, general-এ নয়।
- *       আগে ফোন সবসময় খালি আসত → WhatsApp লিংক '#' হত, কল বাটন দেখাত না।)
- *   2. localdb.addReview → localdb.insert('reviews', ...)
- *      (localdb-তে addReview নামে কোনো ফাংশন নেই, শুধু insert আছে।
- *       আগে ডেমো মোডে রিভিউ জমা দিলে "রিভিউ সেভ করার সুবিধা নেই" এরর আসত।)
- *   3. images / videos / colors / features — Array.isArray গার্ড যোগ
- *      (ডেটাবেসে স্ট্রিং বা null থাকলে .filter/.map ক্র্যাশ করত।)
- *   4. রেটিং সংখ্যা এখন বাংলা অঙ্কে (toBn) — বাকি পেজের সাথে মিলল
- *   5. রিভিউ কাউন্ট হেডার ও ট্যাবে একই সোর্স থেকে (reviewCount)
- *   6. buyNow-তে window.location.href → useNavigate (SPA-তে ফুল রিলোড হবে না)
- *   7. জুম মোডালের বন্ধ বাটনে সরাসরি onClick
- *
- * অপরিবর্তিত (গুরুত্বপূর্ণ):
- *   - ভিডিও প্লে মোড হুবহু আগের মতো:
- *     autoPlay + muted + loop + playsInline + controls={false},
- *     নিজের মিউট/আনমিউট বাটন, একাধিক ভিডিওর থাম্বনেইল স্ট্রিপ।
- *   - v11 ফিচার: product.free_delivery === true হলে ফ্রি ডেলিভারি ব্যাজ
- *   - হাব-ভিত্তিক ডেলিভারি চার্জ: ওই লজিক lib/delivery.js ও Checkout.jsx-এ থাকে,
- *     এই ফাইলে কোনো পরিবর্তন নেই — তাই অক্ষত।
+ * অক্ষত (গুরুত্বপূর্ণ):
+ *   - ভিডিও প্লে মোড: autoPlay + muted + loop + playsInline + controls={false},
+ *     নিজের মিউট বাটন, একাধিক ভিডিওর থাম্বনেইল স্ট্রিপ
+ *   - product.free_delivery === true হলে ফ্রি ডেলিভারি ব্যাজ
+ *   - হাব-ভিত্তিক ডেলিভারি চার্জ: lib/delivery.js ও Checkout.jsx-এ — এখানে ছোঁয়া হয়নি
+ *   - থিম কালার: সব রঙ var(--accent) / var(--accent-soft) থেকে
  * ------------------------------------------------------------
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -53,9 +38,15 @@ import { localdb } from '../lib/localdb.js';
 import { supabase } from '../lib/supabase.js';
 import { money, discountPercent, stockStatus, dateBn, toBn } from '../lib/format.js';
 import { productJsonLd } from '../lib/seo.js';
+import { useSiteConfig } from '../hooks/useSiteConfig.js';
+import {
+  resolveLayout, toBullets,
+  GALLERY_CLASS, DENSITY_CLASS, TITLE_CLASS, PRICE_CLASS, BUTTON_CLASS, DESC_CLASS,
+} from '../lib/layout.js';
 import ProductCard from '../components/ProductCard.jsx';
 import Seo from '../components/Seo.jsx';
 import Loader from '../components/Loader.jsx';
+import '../styles/ProductDetail.css';
 
 const SITE_URL = import.meta.env.VITE_SITE_URL || 'https://impotech.sellsull.com';
 
@@ -66,12 +57,13 @@ const asArray = (v) => (Array.isArray(v) ? v : []);
 function Stars({ value = 0, size = 15 }) {
   const v = Math.round(Number(value) || 0);
   return (
-    <span className="inline-flex items-center gap-0.5">
+    <span className="stars" aria-label={`${v} / 5`}>
       {[1, 2, 3, 4, 5].map((i) => (
         <Star
           key={i}
           size={size}
-          className={i <= v ? 'text-amber-500 fill-amber-500' : 'text-slate-300'}
+          className={i <= v ? '' : 'off'}
+          fill={i <= v ? 'currentColor' : 'none'}
         />
       ))}
     </span>
@@ -85,6 +77,11 @@ export default function ProductDetail() {
     products, categories, addToCart, toggleWishlist, wishlist,
     loading, isSupabaseConfigured, settings,
   } = useStore();
+
+  /* অ্যাডমিনের লেআউট সেটিং */
+  const { config: site } = useSiteConfig();
+  const L = useMemo(() => resolveLayout(site?.layout), [site?.layout]);
+  const D = DENSITY_CLASS[L.density] || DENSITY_CLASS.cozy;
 
   const [product, setProduct] = useState(null);
   const [reviews, setReviews] = useState([]);
@@ -123,10 +120,10 @@ export default function ProductDetail() {
   const stock = product ? stockStatus(product.stock) : { label: '', tone: 'in' };
   const wished = product ? asArray(wishlist).some((w) => w.id === product.id) : false;
 
-  /* v11: এই প্রোডাক্টে ফ্রি ডেলিভারি চালু কি না (কলাম না থাকলে false) */
+  /* v11: এই প্রোডাক্টে ফ্রি ডেলিভারি চালু কি না */
   const freeDelivery = product?.free_delivery === true;
 
-  /* ক্যাটাগরির নাম — products-এ join না থাকলেও কাজ করবে */
+  /* ক্যাটাগরির নাম */
   const category = useMemo(() => {
     if (!product) return null;
     if (product.categories) return product.categories;
@@ -143,7 +140,6 @@ export default function ProductDetail() {
     [products, product]
   );
 
-  /* "একসাথে কেনা হয়" — প্রথম সম্পর্কিত পণ্য */
   const bundleMate = related[0] || null;
   const bundleTotal =
     product && bundleMate
@@ -155,7 +151,6 @@ export default function ProductDetail() {
     return reviews.reduce((s, r) => s + Number(r.rating || 0), 0) / reviews.length;
   }, [reviews, product]);
 
-  /* ৫★ → ১★ বিতরণ */
   const dist = useMemo(() => {
     const d = [0, 0, 0, 0, 0];
     reviews.forEach((r) => {
@@ -166,7 +161,6 @@ export default function ProductDetail() {
   }, [reviews]);
 
   const totalReviews = reviews.length;
-  /* হেডার ও ট্যাব — একই সোর্স */
   const reviewCount = totalReviews || Number(product?.reviews_count || 0);
   const recommendPct = totalReviews
     ? Math.round((reviews.filter((r) => Number(r.rating) >= 4).length / totalReviews) * 100)
@@ -188,13 +182,13 @@ export default function ProductDetail() {
     return (
       <div className="container-x py-24 text-center">
         <h1 className="text-2xl font-semibold">পণ্যটি পাওয়া যায়নি</h1>
-        <p className="mt-2 text-slate-500">সম্ভবত লিংকটি ভুল বা পণ্যটি সরিয়ে ফেলা হয়েছে।</p>
+        <p className="mt-2 text-ink-muted">সম্ভবত লিংকটি ভুল বা পণ্যটি সরিয়ে ফেলা হয়েছে।</p>
         <Link to="/shop" className="btn-primary mt-6 inline-block">সব পণ্য দেখুন</Link>
       </div>
     );
   }
 
-  /* v14 ফিক্স: ফোন নম্বর settings.contact-এ থাকে, general-এ নয় */
+  /* ফোন নম্বর settings.contact-এ থাকে */
   const contact = settings?.contact || {};
   const phone = contact.phone || '';
   const waNumber = String(contact.whatsapp || phone).replace(/[^0-9]/g, '');
@@ -250,7 +244,6 @@ export default function ProductDetail() {
         const { error } = await supabase.from('reviews').insert(payload);
         if (error) throw error;
       } else {
-        /* v14 ফিক্স: localdb-তে addReview নেই — insert('reviews', ...) ব্যবহার */
         localdb.insert('reviews', payload);
         setReviews(localdb.listReviews(product.id) || []);
       }
@@ -266,12 +259,14 @@ export default function ProductDetail() {
 
   const colors = asArray(product.colors);
   const features = asArray(product.features);
+  const bullets = L.desc === 'bullets' ? toBullets(product.description) : [];
+  const title = product.name_bn || product.name;
 
   return (
-    <div className="min-h-screen bg-[#f6f7f8] text-slate-800">
-      <div className="container-x py-4 sm:py-6">
+    <div className="pd-page">
+      <div className="container-x pd-wrap">
         <Seo
-          title={`${product.name_bn || product.name} — ইম্পোটেক`}
+          title={`${title} — ইম্পোটেক`}
           description={product.description || ''}
           image={images[0]}
           url={`${SITE_URL}/product/${product.slug}`}
@@ -280,54 +275,50 @@ export default function ProductDetail() {
         />
 
         {/* ---------- ব্রেডক্রাম্ব ---------- */}
-        <nav className="mb-4 flex flex-wrap items-center gap-1.5 text-[12.5px] text-slate-500">
-          <Link to="/" className="hover:text-amber-600">হোম</Link>
-          <ChevronRight size={13} className="text-slate-400" />
-          <Link to="/shop" className="hover:text-amber-600">শপ</Link>
+        <nav className="pd-crumbs" aria-label="ব্রেডক্রাম্ব">
+          <Link to="/">হোম</Link>
+          <ChevronRight size={12} />
+          <Link to="/shop">শপ</Link>
           {category && (
             <>
-              <ChevronRight size={13} className="text-slate-400" />
-              <Link
-                to={`/shop?category=${product.category_id}`}
-                className="hover:text-amber-600"
-              >
+              <ChevronRight size={12} />
+              <Link to={`/shop?category=${product.category_id}`}>
                 {category.name_bn || category.name}
               </Link>
             </>
           )}
-          <ChevronRight size={13} className="text-slate-400" />
-          <span className="max-w-[200px] truncate text-slate-700">
-            {product.name_bn || product.name}
-          </span>
+          <ChevronRight size={12} />
+          <span className="crumb-now">{title}</span>
         </nav>
 
-        {/* ---------- মূল কার্ড: গ্যালারি + তথ্য ---------- */}
-        <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
-          <div className="grid gap-6 lg:grid-cols-2 lg:gap-10">
-            {/* ===== বাঁ: গ্যালারি ===== */}
-            <div>
-              <div className="group relative aspect-square overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+        {/* ---------- মূল কার্ড ---------- */}
+        <div className={`pd-card ${D.card}`}>
+          <div className={`pd-grid ${D.gap}`}>
+            {/* ===== গ্যালারি ===== */}
+            <div className="pd-gallery">
+              <div className={`pd-main-img ${GALLERY_CLASS[L.gallery]}`}>
                 {images.length > 0 ? (
                   <>
                     <img
                       src={images[activeImg]}
-                      alt={product.name_bn || product.name}
-                      className="h-full w-full object-cover"
+                      alt={title}
+                      loading="eager"
+                      decoding="async"
                     />
                     <button
                       type="button"
                       onClick={() => setZoom(true)}
-                      className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-white/90 text-slate-700 shadow hover:bg-white"
-                      aria-label="জুম"
+                      className="pd-zoom"
+                      aria-label="ছবি বড় করুন"
                     >
-                      <ZoomIn size={17} />
+                      <ZoomIn size={16} />
                     </button>
                     {images.length > 1 && (
                       <>
                         <button
                           type="button"
                           onClick={() => setActiveImg((v) => (v - 1 + images.length) % images.length)}
-                          className="absolute left-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-white/90 text-slate-700 opacity-0 shadow transition-opacity hover:bg-white group-hover:opacity-100"
+                          className="pd-nav prev"
                           aria-label="আগের ছবি"
                         >
                           <ChevronLeft size={18} />
@@ -335,7 +326,7 @@ export default function ProductDetail() {
                         <button
                           type="button"
                           onClick={() => setActiveImg((v) => (v + 1) % images.length)}
-                          className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-white/90 text-slate-700 opacity-0 shadow transition-opacity hover:bg-white group-hover:opacity-100"
+                          className="pd-nav next"
                           aria-label="পরের ছবি"
                         >
                           <ChevronRight size={18} />
@@ -344,143 +335,92 @@ export default function ProductDetail() {
                     )}
                   </>
                 ) : (
-                  <div className="grid h-full w-full place-items-center text-slate-400">ছবি নেই</div>
+                  <div className="pd-noimg">ছবি নেই</div>
                 )}
 
-                {off > 0 && (
-                  <span className="absolute left-3 top-3 rounded-md bg-red-500 px-2.5 py-1 text-xs font-semibold text-white">
-                    -{toBn(off)}%
-                  </span>
-                )}
-                {stock.tone === 'out' && (
-                  <span className="absolute left-3 top-3 rounded-md bg-slate-800 px-2.5 py-1 text-xs font-semibold text-white">
-                    স্টক শেষ
-                  </span>
-                )}
+                {off > 0 && <span className="pd-discount">-{toBn(off)}%</span>}
+                {stock.tone === 'out' && <span className="pd-out">স্টক শেষ</span>}
               </div>
 
               {/* থাম্বনেইল */}
               {images.length > 1 && (
-                <div className="mt-3 flex gap-2.5 overflow-x-auto pb-1">
+                <div className="pd-thumbs">
                   {images.map((img, i) => (
                     <button
                       type="button"
                       key={i}
                       onClick={() => setActiveImg(i)}
-                      className={`h-[68px] w-[68px] shrink-0 overflow-hidden rounded-lg border-2 transition-colors ${
-                        i === activeImg
-                          ? 'border-amber-500'
-                          : 'border-slate-200 hover:border-amber-300'
-                      }`}
+                      className={i === activeImg ? 'on' : ''}
+                      aria-label={`ছবি ${toBn(i + 1)}`}
                     >
-                      <img
-                        src={img}
-                        alt={`থাম্বনেইল ${i + 1}`}
-                        className="h-full w-full object-cover"
-                      />
+                      <img src={img} alt="" loading="lazy" decoding="async" />
                     </button>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* ===== ডান: তথ্য ===== */}
-            <div>
+            {/* ===== তথ্য ===== */}
+            <div className={`pd-info ${D.info}`}>
               {category && (
-                <p className="text-[12.5px] font-medium text-amber-600">
-                  {category.name_bn || category.name}
-                </p>
+                <p className="pd-cat">{category.name_bn || category.name}</p>
               )}
 
-              <h1 className="mt-1 text-xl font-semibold leading-snug text-slate-900 sm:text-2xl">
-                {product.name_bn || product.name}
-              </h1>
-              {product.name_bn && product.name && product.name_bn !== product.name && (
-                <p className="mt-1 text-[13px] text-slate-500">{product.name}</p>
-              )}
-
-              {/* রেটিং */}
-              <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
-                <Stars value={avgRating} />
-                <span className="text-[12.5px] text-slate-500">
-                  ({toBn(reviewCount)} রিভিউ)
-                </span>
-                {product.badge && (
-                  <span className="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
-                    {product.badge}
-                  </span>
+              <div className={L.title === 'centered' ? 'text-center' : ''}>
+                <h1 className={`pd-title ${TITLE_CLASS[L.title]}`}>{title}</h1>
+                {product.name_bn && product.name && product.name_bn !== product.name && (
+                  <p className="pd-en">{product.name}</p>
                 )}
               </div>
 
+              {/* রেটিং */}
+              <div className={`pd-rating ${L.title === 'centered' ? 'center' : ''}`}>
+                <Stars value={avgRating} />
+                <span className="pd-rev">({toBn(reviewCount)} রিভিউ)</span>
+                {product.badge && <span className="pd-tag accent">{product.badge}</span>}
+              </div>
+
               {/* দাম */}
-              <div className="mt-4 flex flex-wrap items-end gap-2.5">
-                <span className="text-[26px] font-bold leading-none text-slate-900 sm:text-[30px]">
-                  {money(product.price)}
-                </span>
+              <div className={`pd-price ${PRICE_CLASS[L.price]}`}>
+                <b>{money(product.price)}</b>
                 {Number(product.old_price || 0) > Number(product.price || 0) && (
                   <>
-                    <span className="text-[15px] text-slate-400 line-through">
-                      {money(product.old_price)}
-                    </span>
-                    <span className="mb-0.5 rounded border border-green-200 bg-green-50 px-2 py-0.5 text-[11.5px] font-semibold text-green-700">
-                      সাশ্রয় {toBn(off)}%
-                    </span>
+                    <s>{money(product.old_price)}</s>
+                    <span className="pd-save">সাশ্রয় {toBn(off)}%</span>
                   </>
                 )}
               </div>
 
               {/* স্টক */}
-              <p
-                className={`mt-2 text-[12.5px] font-medium ${
-                  stock.tone === 'out'
-                    ? 'text-red-500'
-                    : stock.tone === 'low'
-                    ? 'text-amber-600'
-                    : 'text-green-600'
-                }`}
-              >
-                ● {stock.label}
-              </p>
+              <p className={`pd-stock ${stock.tone}`}>● {stock.label}</p>
 
-              {/* v11: ফ্রি ডেলিভারি */}
+              {/* ফ্রি ডেলিভারি */}
               {freeDelivery && (
-                <div className="mt-3 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2">
-                  <BadgeCheck size={16} className="shrink-0 text-green-600" />
+                <div className="pd-free">
+                  <BadgeCheck size={16} />
                   <div>
-                    <p className="text-[13px] font-semibold text-green-700">
-                      এই পণ্যে ফ্রি ডেলিভারি
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-slate-500">
-                      এই পণ্যের ডেলিভারি চার্জ সম্পূর্ণ ফ্রি
-                    </p>
+                    <b>এই পণ্যে ফ্রি ডেলিভারি</b>
+                    <small>এই পণ্যের ডেলিভারি চার্জ সম্পূর্ণ ফ্রি</small>
                   </div>
                 </div>
               )}
 
               {/* সংক্ষিপ্ত বর্ণনা */}
               {product.description && (
-                <p className="mt-3 line-clamp-4 text-[13.5px] leading-relaxed text-slate-600">
-                  {product.description}
-                </p>
+                <p className={`pd-desc ${DESC_CLASS[L.desc]}`}>{product.description}</p>
               )}
 
               {/* ভ্যারিয়েন্ট */}
               {colors.length > 0 && (
-                <div className="mt-4">
-                  <label className="mb-1.5 block text-[12.5px] font-medium text-slate-700">
-                    রঙ / ভ্যারিয়েন্ট
-                  </label>
-                  <div className="flex flex-wrap gap-2">
+                <div className="pd-colors">
+                  <p className="pd-label">রঙ / ভ্যারিয়েন্ট</p>
+                  <div className="pd-color-row">
                     {colors.map((c) => (
                       <button
                         type="button"
                         key={c}
                         onClick={() => setVariant(c)}
-                        className={`rounded-md border px-3 py-1.5 text-[13px] transition-colors ${
-                          variant === c
-                            ? 'border-amber-500 bg-amber-50 text-amber-700'
-                            : 'border-slate-200 text-slate-600 hover:border-amber-300'
-                        }`}
+                        className={variant === c ? 'on' : ''}
                       >
                         {c}
                       </button>
@@ -490,24 +430,20 @@ export default function ProductDetail() {
               )}
 
               {/* পরিমাণ */}
-              <div className="mt-4">
-                <label className="mb-1.5 block text-[12.5px] font-medium text-slate-700">
-                  পরিমাণ
-                </label>
-                <div className="inline-flex items-center rounded-md border border-slate-300">
+              <div className="pd-qty-wrap">
+                <p className="pd-label">পরিমাণ</p>
+                <div className="pd-qty">
                   <button
                     type="button"
                     onClick={() => setQty((v) => Math.max(1, v - 1))}
-                    className="grid h-9 w-10 place-items-center text-slate-500 hover:text-slate-900"
                     aria-label="কমান"
                   >
                     <Minus size={15} />
                   </button>
-                  <span className="w-11 text-center text-[13.5px] font-medium">{toBn(qty)}</span>
+                  <span>{toBn(qty)}</span>
                   <button
                     type="button"
                     onClick={() => setQty((v) => v + 1)}
-                    className="grid h-9 w-10 place-items-center text-slate-500 hover:text-slate-900"
                     aria-label="বাড়ান"
                   >
                     <Plus size={15} />
@@ -515,73 +451,60 @@ export default function ProductDetail() {
                 </div>
               </div>
 
-              {/* দুই বাটন */}
-              <div className="mt-4 flex gap-2.5">
-                <button
-                  type="button"
-                  onClick={add}
-                  className="flex h-11 flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 text-[14px] font-medium text-slate-800 transition-colors hover:bg-slate-50"
-                >
+              {/* বাটন */}
+              <div className={`pd-buy ${BUTTON_CLASS[L.buttons]}`}>
+                <button type="button" onClick={add} className="pd-add">
                   <ShoppingCart size={16} /> কার্টে যোগ করুন
                 </button>
-                <button
-                  type="button"
-                  onClick={buyNow}
-                  className="h-11 flex-1 rounded-md bg-amber-500 text-[14px] font-semibold text-black transition-colors hover:bg-amber-400"
-                >
+                <button type="button" onClick={buyNow} className="pd-buynow">
                   এখনই কিনুন
                 </button>
                 <button
                   type="button"
                   onClick={wish}
-                  className={`grid h-11 w-11 place-items-center rounded-md border transition-colors ${
-                    wished
-                      ? 'border-amber-500 bg-amber-50 text-amber-600'
-                      : 'border-slate-300 text-slate-400 hover:border-amber-400 hover:text-amber-600'
-                  }`}
+                  className={`pd-wish ${wished ? 'on' : ''}`}
                   aria-label="উইশলিস্ট"
                 >
-                  <Heart size={17} className={wished ? 'fill-amber-500' : ''} />
+                  <Heart size={17} fill={wished ? 'currentColor' : 'none'} />
                 </button>
               </div>
 
               {/* WhatsApp / কল */}
-              <div className="mt-2.5 flex gap-2.5">
+              <div className="pd-contact">
                 <a
                   href={
                     waNumber
                       ? `https://wa.me/${waNumber}?text=${encodeURIComponent(
-                          `আমি এই পণ্যটি নিতে চাই: ${product.name_bn || product.name}`
+                          `আমি এই পণ্যটি নিতে চাই: ${title}`
                         )}`
                       : '#'
                   }
                   target="_blank"
                   rel="noreferrer"
-                  className="flex h-10 flex-1 items-center justify-center gap-2 rounded-md bg-[#25D366] text-[13px] font-medium text-white hover:brightness-105"
+                  className="pd-wa"
                 >
                   <MessageCircle size={15} /> WhatsApp-এ অর্ডার
                 </a>
                 {phone && (
-                  <a
-                    href={`tel:${phone}`}
-                    className="flex h-10 flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
-                  >
+                  <a href={`tel:${phone}`} className="pd-call">
                     <Phone size={15} /> কল করুন
                   </a>
                 )}
               </div>
 
               {/* সুবিধা */}
-              <div className="mt-5 grid grid-cols-3 gap-2 border-t border-slate-100 pt-4">
+              <div className="pd-perks">
                 {[
                   { icon: Truck, t: 'দ্রুত ডেলিভারি', s: '২–৪ দিন' },
                   { icon: ShieldCheck, t: 'নিরাপদ পেমেন্ট', s: 'COD সুবিধা' },
                   { icon: RotateCcw, t: '৭ দিনের রিটার্ন', s: 'শর্তসাপেক্ষে' },
                 ].map((b, i) => (
-                  <div key={i} className="text-center">
-                    <b.icon size={17} className="mx-auto text-amber-500" />
-                    <p className="mt-1 text-[11px] font-medium text-slate-700">{b.t}</p>
-                    <p className="text-[10px] text-slate-400">{b.s}</p>
+                  <div key={i}>
+                    <b.icon size={17} />
+                    <span>
+                      <b>{b.t}</b>
+                      <small>{b.s}</small>
+                    </span>
                   </div>
                 ))}
               </div>
@@ -591,64 +514,46 @@ export default function ProductDetail() {
 
         {/* ---------- একসাথে কেনা হয় ---------- */}
         {bundleMate && (
-          <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-            <h2 className="mb-3 text-[14px] font-semibold text-slate-900">
-              একসাথে বেশি কেনা হয়
-            </h2>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2.5">
-                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-50">
-                  {images[0] && (
-                    <img src={images[0]} alt="" className="h-full w-full object-cover" />
-                  )}
+          <div className={`pd-card pd-bundle ${D.section}`}>
+            <h2>একসাথে বেশি কেনা হয়</h2>
+            <div className="pd-bundle-row">
+              <div className="pd-bundle-item">
+                <div className="pd-bundle-img">
+                  {images[0] && <img src={images[0]} alt="" loading="lazy" />}
                 </div>
                 <div>
-                  <p className="max-w-[150px] truncate text-[12.5px] font-medium text-slate-800">
-                    {product.name_bn || product.name}
-                  </p>
-                  <p className="text-[12px] text-slate-500">{money(product.price)}</p>
+                  <p>{title}</p>
+                  <small>{money(product.price)}</small>
                 </div>
               </div>
 
-              <span className="text-lg font-light text-slate-300">+</span>
+              <span className="pd-op">+</span>
 
-              <div className="flex items-center gap-2.5">
-                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-50">
+              <div className="pd-bundle-item">
+                <div className="pd-bundle-img">
                   {asArray(bundleMate.images)[0] && (
-                    <img
-                      src={asArray(bundleMate.images)[0]}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
+                    <img src={asArray(bundleMate.images)[0]} alt="" loading="lazy" />
                   )}
                 </div>
                 <div>
-                  <p className="max-w-[150px] truncate text-[12.5px] font-medium text-slate-800">
-                    {bundleMate.name_bn || bundleMate.name}
-                  </p>
-                  <p className="text-[12px] text-slate-500">{money(bundleMate.price)}</p>
+                  <p>{bundleMate.name_bn || bundleMate.name}</p>
+                  <small>{money(bundleMate.price)}</small>
                 </div>
               </div>
 
-              <span className="text-lg font-light text-slate-300">=</span>
+              <span className="pd-op">=</span>
 
-              <div className="ml-auto flex items-center gap-3">
-                <span className="text-[15px] font-bold text-slate-900">{money(bundleTotal)}</span>
-                <button
-                  type="button"
-                  onClick={addBundle}
-                  className="h-9 rounded-md bg-slate-900 px-4 text-[12.5px] font-medium text-white hover:bg-slate-800"
-                >
-                  দুটোই কার্টে নিন
-                </button>
+              <div className="pd-bundle-total">
+                <b>{money(bundleTotal)}</b>
+                <button type="button" onClick={addBundle}>দুটোই কার্টে নিন</button>
               </div>
             </div>
           </div>
         )}
 
         {/* ---------- ট্যাব ---------- */}
-        <div className="mt-4 rounded-xl border border-slate-200 bg-white">
-          <div className="flex gap-1 overflow-x-auto border-b border-slate-200 px-2 sm:px-4">
+        <div className={`pd-tabs ${D.section}`}>
+          <div className="pd-tab-head" role="tablist">
             {[
               { id: 'desc', label: 'বিবরণ' },
               { id: 'video', label: `ভিডিও${videos.length ? ` (${toBn(videos.length)})` : ''}` },
@@ -657,36 +562,44 @@ export default function ProductDetail() {
               <button
                 type="button"
                 key={t.id}
+                role="tab"
+                aria-selected={tab === t.id}
                 onClick={() => setTab(t.id)}
-                className={`-mb-px whitespace-nowrap border-b-2 px-3.5 py-3 text-[13.5px] font-medium transition-colors ${
-                  tab === t.id
-                    ? 'border-amber-500 text-amber-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
+                className={tab === t.id ? 'on' : ''}
               >
                 {t.label}
               </button>
             ))}
           </div>
 
-          <div className="p-4 sm:p-6">
+          <div className="pd-tab-body">
             {/* --- বিবরণ --- */}
             {tab === 'desc' && (
-              <div className="max-w-3xl">
-                <h3 className="mb-2 text-[14px] font-semibold text-slate-900">পণ্যের বিবরণ</h3>
-                <p className="whitespace-pre-line text-[13.5px] leading-relaxed text-slate-600">
-                  {product.description || 'এই পণ্যের বিস্তারিত বর্ণনা শীঘ্রই যোগ করা হবে।'}
-                </p>
+              <div className="pd-desc-body">
+                <h3>পণ্যের বিবরণ</h3>
+
+                {bullets.length > 0 ? (
+                  <ul className="pd-feat-list">
+                    {bullets.map((b, i) => (
+                      <li key={i}>
+                        <Check size={15} />
+                        <span>{b}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="pd-long">
+                    {product.description || 'এই পণ্যের বিস্তারিত বর্ণনা শীঘ্রই যোগ করা হবে।'}
+                  </p>
+                )}
 
                 {features.length > 0 && (
                   <>
-                    <h3 className="mb-2 mt-5 text-[14px] font-semibold text-slate-900">
-                      প্রধান বৈশিষ্ট্য
-                    </h3>
-                    <ul className="space-y-1.5">
+                    <h3>প্রধান বৈশিষ্ট্য</h3>
+                    <ul className="pd-feat-list">
                       {features.map((f, i) => (
-                        <li key={i} className="flex items-start gap-2 text-[13.5px] text-slate-600">
-                          <Check size={15} className="mt-0.5 shrink-0 text-green-600" />
+                        <li key={i}>
+                          <Check size={15} />
                           <span>{f}</span>
                         </li>
                       ))}
@@ -694,27 +607,23 @@ export default function ProductDetail() {
                   </>
                 )}
 
-                {product.tag && (
-                  <p className="mt-4 text-[12px] text-slate-400">ট্যাগ: {product.tag}</p>
-                )}
+                {product.tag && <p className="pd-tagline">ট্যাগ: {product.tag}</p>}
               </div>
             )}
 
             {/* --- ভিডিও: প্লে মোড আগের মতোই --- */}
             {tab === 'video' && (
-              <div className="max-w-3xl">
+              <div className="pd-video-body">
                 {videos.length === 0 ? (
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-10 text-center text-[13px] text-slate-400">
-                    এই পণ্যের কোনো ভিডিও এখনো যোগ করা হয়নি।
-                  </div>
+                  <div className="pd-empty">এই পণ্যের কোনো ভিডিও এখনো যোগ করা হয়নি।</div>
                 ) : (
                   <>
-                    <div className="relative aspect-video overflow-hidden rounded-lg bg-black">
+                    <div className="pd-video-stage">
                       <video
                         ref={videoRef}
                         key={videos[activeVideo]}
                         src={videos[activeVideo]}
-                        className="h-full w-full object-contain"
+                        className="pd-main-video"
                         muted={muted}
                         autoPlay
                         loop
@@ -724,7 +633,7 @@ export default function ProductDetail() {
                       <button
                         type="button"
                         onClick={() => setMuted((v) => !v)}
-                        className="absolute bottom-3 right-3 grid h-10 w-10 place-items-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                        className="pd-mute"
                         aria-label={muted ? 'সাউন্ড চালু' : 'সাউন্ড বন্ধ'}
                       >
                         {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
@@ -732,26 +641,18 @@ export default function ProductDetail() {
                     </div>
 
                     {videos.length > 1 && (
-                      <div className="mt-3 flex gap-3 overflow-x-auto pb-1">
+                      <div className="pd-thumbs pd-vthumbs">
                         {videos.map((v, i) => (
                           <button
                             type="button"
                             key={i}
                             onClick={() => setActiveVideo(i)}
-                            className={`relative h-16 w-24 shrink-0 overflow-hidden rounded-lg border-2 bg-black ${
-                              i === activeVideo
-                                ? 'border-amber-500'
-                                : 'border-slate-200 hover:border-amber-300'
-                            }`}
+                            className={i === activeVideo ? 'on' : ''}
+                            aria-label={`ভিডিও ${toBn(i + 1)}`}
                           >
-                            <video
-                              src={v}
-                              className="h-full w-full object-cover"
-                              muted
-                              preload="metadata"
-                            />
-                            <span className="absolute inset-0 grid place-items-center bg-black/30">
-                              <Play size={16} className="text-white" />
+                            <video src={v} muted preload="metadata" />
+                            <span className="pd-thumb-play">
+                              <Play size={16} />
                             </span>
                           </button>
                         ))}
@@ -764,61 +665,47 @@ export default function ProductDetail() {
 
             {/* --- রিভিউ --- */}
             {tab === 'reviews' && (
-              <div className="max-w-3xl">
-                {/* সারসংক্ষেপ */}
-                <div className="flex flex-col gap-5 border-b border-slate-100 pb-5 sm:flex-row">
-                  <div className="shrink-0 text-center sm:w-40 sm:text-left">
-                    <p className="text-[34px] font-bold leading-none text-slate-900">
-                      {toBn((Math.round(avgRating * 10) / 10).toFixed(1))}
-                    </p>
-                    <div className="mt-1.5 flex justify-center sm:justify-start">
-                      <Stars value={avgRating} size={14} />
-                    </div>
-                    <p className="mt-1 text-[11.5px] text-slate-500">
-                      {toBn(reviewCount)} রিভিউ
-                    </p>
-                    <p className="mt-0.5 text-[11.5px] text-slate-500">
-                      {toBn(recommendPct)}% সুপারিশ
-                    </p>
+              <div className="pd-rev-body">
+                <div className="pd-rev-sum">
+                  <div className="pd-rev-score">
+                    <b>{toBn((Math.round(avgRating * 10) / 10).toFixed(1))}</b>
+                    <Stars value={avgRating} size={14} />
+                    <small>{toBn(reviewCount)} রিভিউ</small>
+                    <small>{toBn(recommendPct)}% সুপারিশ</small>
                   </div>
 
-                  <div className="max-w-xs flex-1 space-y-1.5">
+                  <div className="pd-rev-bars">
                     {[5, 4, 3, 2, 1].map((n) => {
                       const c = dist[n - 1];
                       const pct = totalReviews ? Math.round((c / totalReviews) * 100) : 0;
                       return (
-                        <div key={n} className="flex items-center gap-2">
-                          <span className="w-7 text-right text-[11px] text-slate-500">
-                            {toBn(n)}★
-                          </span>
-                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200">
-                            <div className="h-full bg-amber-500" style={{ width: `${pct}%` }} />
+                        <div key={n} className="pd-bar-row">
+                          <span>{toBn(n)}★</span>
+                          <div className="pd-bar">
+                            <i style={{ width: `${pct}%` }} />
                           </div>
-                          <span className="w-6 text-[11px] text-slate-400">{toBn(c)}</span>
+                          <em>{toBn(c)}</em>
                         </div>
                       );
                     })}
                   </div>
                 </div>
 
-                {/* লেখার ফর্ম */}
-                <form onSubmit={submitReview} className="pt-5">
-                  <h3 className="mb-2.5 text-[13.5px] font-semibold text-slate-900">
-                    আপনার রিভিউ লিখুন
-                  </h3>
-                  <div className="grid gap-2.5 sm:grid-cols-2">
+                <form onSubmit={submitReview} className="pd-rev-form">
+                  <h3>আপনার রিভিউ লিখুন</h3>
+                  <div className="pd-rev-fields">
                     <input
                       value={reviewForm.name}
                       onChange={(e) => setReviewForm((f) => ({ ...f, name: e.target.value }))}
                       placeholder="আপনার নাম"
-                      className="h-10 rounded-md border border-slate-300 px-3 text-[13px] text-slate-800 placeholder:text-slate-400 focus:border-amber-500 focus:outline-none"
+                      aria-label="আপনার নাম"
                     />
                     <select
                       value={reviewForm.rating}
                       onChange={(e) =>
                         setReviewForm((f) => ({ ...f, rating: Number(e.target.value) }))
                       }
-                      className="h-10 rounded-md border border-slate-300 px-3 text-[13px] text-slate-800 focus:border-amber-500 focus:outline-none"
+                      aria-label="রেটিং"
                     >
                       <option value={5}>৫ — চমৎকার</option>
                       <option value={4}>৪ — ভালো</option>
@@ -832,41 +719,32 @@ export default function ProductDetail() {
                     onChange={(e) => setReviewForm((f) => ({ ...f, text: e.target.value }))}
                     placeholder="পণ্যটি সম্পর্কে আপনার মতামত লিখুন"
                     rows={3}
-                    className="mt-2.5 w-full resize-y rounded-md border border-slate-300 px-3 py-2 text-[13px] text-slate-800 placeholder:text-slate-400 focus:border-amber-500 focus:outline-none"
+                    aria-label="রিভিউ"
                   />
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="mt-2.5 h-10 rounded-md bg-slate-900 px-5 text-[13px] font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-                  >
+                  <button type="submit" disabled={submitting} className="pd-rev-submit">
                     {submitting ? 'পাঠানো হচ্ছে…' : 'রিভিউ জমা দিন'}
                   </button>
                 </form>
 
-                {/* তালিকা */}
-                <div className="mt-6 space-y-3">
+                <div className="pd-rev-list">
                   {reviews.length === 0 ? (
-                    <p className="text-[13px] text-slate-400">এখনো কোনো রিভিউ নেই।</p>
+                    <p className="pd-empty">এখনো কোনো রিভিউ নেই।</p>
                   ) : (
                     reviews.map((r) => (
-                      <div key={r.id} className="rounded-lg border border-slate-200 p-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2.5">
-                            <span className="grid h-9 w-9 place-items-center rounded-full border border-amber-200 bg-amber-50 text-[13px] font-semibold text-amber-700">
+                      <div key={r.id} className="pd-rev-item">
+                        <div className="pd-rev-head">
+                          <div className="pd-rev-who">
+                            <span className="pd-avatar">
                               {(r.customer_name || '?').charAt(0)}
                             </span>
                             <div>
-                              <p className="text-[13px] font-medium text-slate-800">
-                                {r.customer_name}
-                              </p>
-                              <p className="text-[11px] text-slate-400">{dateBn(r.created_at)}</p>
+                              <p>{r.customer_name}</p>
+                              <small>{dateBn(r.created_at)}</small>
                             </div>
                           </div>
                           <Stars value={r.rating} size={13} />
                         </div>
-                        <p className="mt-2.5 text-[13px] leading-relaxed text-slate-600">
-                          {r.text || r.comment}
-                        </p>
+                        <p className="pd-rev-text">{r.text || r.comment}</p>
                       </div>
                     ))
                   )}
@@ -878,14 +756,12 @@ export default function ProductDetail() {
 
         {/* ---------- সম্পর্কিত পণ্য ---------- */}
         {related.length > 0 && (
-          <section className="mt-6">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-[15px] font-semibold text-slate-900">সম্পর্কিত পণ্য</h2>
-              <Link to="/shop" className="text-[12.5px] text-amber-600 hover:underline">
-                আরও পণ্য →
-              </Link>
+          <section className={`pd-related ${D.section}`}>
+            <div className="pd-related-head">
+              <h2>সম্পর্কিত পণ্য</h2>
+              <Link to="/shop">আরও পণ্য →</Link>
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+            <div className="pd-related-grid">
               {related.map((p) => (
                 <ProductCard key={p.id} product={p} />
               ))}
@@ -894,29 +770,36 @@ export default function ProductDetail() {
         )}
       </div>
 
+      {/* ---------- মোবাইল স্টিকি বার ---------- */}
+      {L.stickyBar && (
+        <div className="pd-sticky">
+          <div className="pd-sticky-price">
+            <b>{money(product.price)}</b>
+            {off > 0 && <s>{money(product.old_price)}</s>}
+          </div>
+          <button type="button" onClick={add} className="pd-sticky-add">
+            <ShoppingCart size={16} /> কার্টে যোগ
+          </button>
+          <button type="button" onClick={buyNow} className="pd-sticky-buy">
+            কিনুন
+          </button>
+        </div>
+      )}
+
       {/* ---------- জুম মোডাল ---------- */}
       {zoom && images[activeImg] && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/90 p-4"
-          onClick={() => setZoom(false)}
-        >
+        <div className="pd-zoom-wrap" onClick={() => setZoom(false)}>
           <button
             type="button"
             onClick={() => setZoom(false)}
-            className="absolute right-5 top-5 grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20"
+            className="pd-zoom-close"
             aria-label="বন্ধ"
           >
             <X size={22} />
           </button>
-          <img
-            src={images[activeImg]}
-            alt={product.name_bn || product.name}
-            className="max-h-full max-w-full object-contain"
-          />
+          <img src={images[activeImg]} alt={title} />
         </div>
       )}
     </div>
   );
 }
-
-মোট ৯২১ লাইন। v14-এ ঠিক করা হয়েছে: ফোন নম্বর settings.general.phone → settings.contact.phone (আগে WhatsApp/কল কাজ করত না), রিভিউ সেভ localdb.addReview → localdb.insert('reviews', ...) (আগে এরর আসত), images/videos/colors/features-এ Array.isArray গার্ড, রেটিং সংখ্যা বাংলা অঙ্কে, রিভিউ কাউন্ট একই সোর্স থেকে, buyNow-তে useNavigate, আর জুম মোডালের বন্ধ বাটনে সরাসরি onClick।

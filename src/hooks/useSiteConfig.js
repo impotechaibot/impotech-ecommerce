@@ -1,6 +1,6 @@
 import{useCallback,useEffect,useState}from"react";import{STORE_INFO,slides as DEFAULT_SLIDES,banners as DEFAULT_BANNERS,services as DEFAULT_SERVICES,footerLinks as DEFAULT_FOOTER_LINKS}from"../productsStore/Store.js";import{DEFAULT_LAYOUT}from"../lib/layout.js";export const SITE_KEY="impotech_site",SITE_EVENT="impotech-site-change",DEFAULT_NAV=[{id:"n1",label:"হোম",to:"/",end:!0},{id:"n2",label:"ফ্ল্যাশ সেল",to:"/products?sort=flash",hot:!0},{id:"n3",label:"সব পণ্য",to:"/products"},{id:"n4",label:"রাইডিং গিয়ার",to:"/products?category=riding-gear"},{id:"n5",label:"অর্ডার ট্র্যাকিং",to:"/track"}],DEFAULT_CONTENT={about:{title:"আমাদের সম্পর্কে",body:`ইম্পোটেক — চায়না থেকে সরাসরি আমদানি করা প্রিমিয়াম বাইক অ্যাকসেসরিজের বিশ্বস্ত ঠিকানা।
 
-আমরা ২০২০ সাল থেকে বাংলাদেশের রাইডারদের জন্য মানসম্মত LED লাইট, রাইডিং গিয়ার ও বাইক অ্যাক্সেসরিজ সরবরাহ করে আসছি। প্রতিটি পণ্য নিজে হাতে যাচাই করে তারপর তালিকায় যোগ করা হয়, যাতে আপনি পান অরিজিনাল কোয়ালিটি নিশ্চিন্তে।
+আমরা ২০২৫ সাল থেকে বাংলাদেশের রাইডারদের জন্য মানসম্মত LED লাইট, রাইডিং গিয়ার ও বাইক অ্যাক্সেসরিজ সরবরাহ করে আসছি। প্রতিটি পণ্য নিজে হাতে যাচাই করে তারপর তালিকায় যোগ করা হয়, যাতে আপনি পান অরিজিনাল কোয়ালিটি নিশ্চিন্তে।
 
 আমাদের লক্ষ্য একটাই — সাশ্রয়ী দামে সেরা মানের পণ্য, দ্রুত ডেলিভারি আর আন্তরিক কাস্টমার সাপোর্ট।`},privacy:{title:"প্রাইভেসি পলিসি",body:`আপনার ব্যক্তিগত তথ্যের গোপনীয়তা আমাদের কাছে সর্বোচ্চ গুরুত্বপূর্ণ।
 

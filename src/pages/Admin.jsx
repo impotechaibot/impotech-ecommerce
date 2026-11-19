@@ -21,6 +21,7 @@ import {
   FiFileText,
   FiSettings,
   FiSliders,
+  FiLayout, // (ক) নতুন আইকন
   FiPhone,
   FiCreditCard,
   FiSearch,
@@ -54,6 +55,7 @@ import CheckoutAdmin from '../components/admin/CheckoutAdmin.jsx';
 import SeoAdmin from '../components/admin/SeoAdmin.jsx';
 import BackupAdmin from '../components/admin/BackupAdmin.jsx';
 import AdminSettings from '../components/admin/AdminSettings.jsx';
+import LayoutAdmin from '../components/admin/LayoutAdmin.jsx'; // (খ) নতুন কম্পোনেন্ট
 import '../styles/Admin.css';
 import '../styles/AdminSections.css';
 
@@ -81,6 +83,7 @@ const TABS = [
     { id: 'content', label: 'পেজ কনটেন্ট', icon: FiFileText },
     { id: 'site', label: 'সাইট সেটিংস', icon: FiSettings },
     { id: 'theme', label: 'থিম', icon: FiSliders },
+    { id: 'layout', label: 'লেআউট', icon: FiLayout }, // (গ) নতুন ট্যাব
     { id: 'background', label: 'ব্যাকগ্রাউন্ড', icon: FiDroplet },
   ] },
   { group: 'সেটআপ', items: [
@@ -273,6 +276,7 @@ const Admin = () => {
         {tab === 'content' && <ContentAdmin />}
         {tab === 'site' && <SiteSettingsAdmin />}
         {tab === 'theme' && <ThemeAdmin />}
+        {tab === 'layout' && <LayoutAdmin />} {/* (ঘ) নতুন ট্যাব রেন্ডার */}
         {tab === 'contact' && <ContactAdmin />}
         {tab === 'checkout' && <CheckoutAdmin />}
         {tab === 'seo' && <SeoAdmin />}

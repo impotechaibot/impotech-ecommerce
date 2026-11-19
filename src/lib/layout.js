@@ -1,119 +1,115 @@
-/**
- * layout.js — প্রোডাক্ট পেজের লেআউট ভ্যারিয়েন্ট
- * ------------------------------------------------------------
- * বসানোর পাথ:  src/lib/layout.js   (নতুন ফাইল)
- *
- * অ্যাডমিন → "লেআউট" ট্যাব থেকে যা বেছে নেওয়া হয়, তা
- * localStorage['impotech_site'].layout-এ সেভ হয়।
- * resolveLayout() সেই মান পড়ে নিরাপদ ডিফল্টসহ ফেরত দেয়,
- * আর নিচের ক্লাস-ম্যাপগুলো ProductDetail.jsx-এ প্রয়োগ হয়।
- * ------------------------------------------------------------
- */
+/* ==========================================================
+   layout.js — প্রোডাক্ট পেজের লেআউট ভ্যারিয়েন্ট
+   ----------------------------------------------------------
+   বসানোর পাথ:  src/lib/layout.js   (নতুন ফাইল)
 
-/* ---------- ডিফল্ট (কিছু সেট না থাকলে আগের চেহারাই) ---------- */
+   অ্যাডমিনের "লেআউট" ট্যাব থেকে যা বাছা হয়, সেটি
+   settings.layout-এ জমা হয় এবং ProductDetail.jsx এখান থেকে
+   ক্লাস-নাম বের করে।
+   ========================================================== */
+
 export const DEFAULT_LAYOUT = {
-  gallery: 'square',   // square | wide | tall
-  title: 'stacked',    // stacked | inline | centered
-  price: 'inline',     // inline | stacked | boxed
-  buttons: 'split',    // split | stacked | full
-  desc: 'plain',       // plain | card | bullets
-  density: 'cozy',     // compact | cozy | roomy
-  stickyBar: true,     // মোবাইলে নিচে ভাসমান কার্ট বার
+  imageRatio: 'square',   // square | wide | tall
+  titleStyle: 'stacked',  // stacked | inline | centered
+  priceStyle: 'inline',   // inline | stacked | boxed
+  buttonStyle: 'split',   // split | stacked | full
+  descStyle: 'plain',     // plain | card | bullets
+  spacing: 'cozy',        // compact | cozy | roomy
+  stickyBar: true,
 };
 
-const VALID = {
-  gallery: ['square', 'wide', 'tall'],
-  title: ['stacked', 'inline', 'centered'],
-  price: ['inline', 'stacked', 'boxed'],
-  buttons: ['split', 'stacked', 'full'],
-  desc: ['plain', 'card', 'bullets'],
-  density: ['compact', 'cozy', 'roomy'],
-};
+export const LAYOUT_GROUPS = [
+  {
+    key: 'imageRatio',
+    label: 'ছবির অনুপাত',
+    options: [
+      { value: 'square', label: 'স্কয়ার (১:১)' },
+      { value: 'wide', label: 'ওয়াইড (৪:৩)' },
+      { value: 'tall', label: 'টল (৩:৪)' },
+    ],
+  },
+  {
+    key: 'titleStyle',
+    label: 'শিরোনামের বিন্যাস',
+    options: [
+      { value: 'stacked', label: 'স্ট্যাকড' },
+      { value: 'inline', label: 'ইনলাইন' },
+      { value: 'centered', label: 'সেন্টারড' },
+    ],
+  },
+  {
+    key: 'priceStyle',
+    label: 'দামের বিন্যাস',
+    options: [
+      { value: 'inline', label: 'ইনলাইন' },
+      { value: 'stacked', label: 'স্ট্যাকড' },
+      { value: 'boxed', label: 'বক্সড' },
+    ],
+  },
+  {
+    key: 'buttonStyle',
+    label: 'বাটনের বিন্যাস',
+    options: [
+      { value: 'split', label: 'স্প্লিট' },
+      { value: 'stacked', label: 'স্ট্যাকড' },
+      { value: 'full', label: 'ফুল' },
+    ],
+  },
+  {
+    key: 'descStyle',
+    label: 'বর্ণনার স্টাইল',
+    options: [
+      { value: 'plain', label: 'প্লেইন' },
+      { value: 'card', label: 'কার্ড' },
+      { value: 'bullets', label: 'বুলেট' },
+    ],
+  },
+  {
+    key: 'spacing',
+    label: 'স্পেসিং',
+    options: [
+      { value: 'compact', label: 'কম্প্যাক্ট' },
+      { value: 'cozy', label: 'কোজি' },
+      { value: 'roomy', label: 'রুমি' },
+    ],
+  },
+];
 
-/** যেকোনো ইনপুট → বৈধ লেআউট অবজেক্ট (কখনো ক্র্যাশ করবে না) */
-export function resolveLayout(raw) {
+const ALLOWED = LAYOUT_GROUPS.reduce((acc, g) => {
+  acc[g.key] = g.options.map((o) => o.value);
+  return acc;
+}, {});
+
+/** কখনো ক্র্যাশ করে না — ভুল/খালি ইনপুটে ডিফল্ট ফেরত দেয়। */
+export const resolveLayout = (raw) => {
   const src = raw && typeof raw === 'object' ? raw : {};
   const out = { ...DEFAULT_LAYOUT };
-
-  Object.keys(VALID).forEach((key) => {
-    const v = src[key];
-    if (typeof v === 'string' && VALID[key].includes(v)) out[key] = v;
+  Object.keys(ALLOWED).forEach((k) => {
+    if (ALLOWED[k].includes(src[k])) out[k] = src[k];
   });
-
-  if (typeof src.stickyBar === 'boolean') out.stickyBar = src.stickyBar;
-
+  out.stickyBar = src.stickyBar !== false;
   return out;
-}
-
-/* ---------- গ্যালারির অনুপাত ---------- */
-export const GALLERY_CLASS = {
-  square: 'aspect-square',
-  wide: 'aspect-[4/3]',
-  tall: 'aspect-[3/4]',
 };
 
-/* ---------- স্পেসিং ---------- */
-export const DENSITY_CLASS = {
-  compact: {
-    card: 'p-3 sm:p-5',
-    gap: 'gap-3 lg:gap-8',
-    section: 'mt-2.5',
-    info: 'space-y-2.5',
-  },
-  cozy: {
-    card: 'p-3.5 sm:p-6',
-    gap: 'gap-4 lg:gap-10',
-    section: 'mt-3',
-    info: 'space-y-3',
-  },
-  roomy: {
-    card: 'p-4 sm:p-7',
-    gap: 'gap-5 lg:gap-12',
-    section: 'mt-4',
-    info: 'space-y-4',
-  },
+/** ProductDetail.jsx-এ ব্যবহারের জন্য ক্লাস-নাম। */
+export const layoutClasses = (raw) => {
+  const l = resolveLayout(raw);
+  return {
+    page: `pd-page pd-space-${l.spacing}`,
+    grid: 'pd-grid',
+    gallery: `pd-gallery pd-ratio-${l.imageRatio}`,
+    info: `pd-info pd-title-${l.titleStyle} pd-price-${l.priceStyle}`,
+    buy: `pd-buy pd-buy-${l.buttonStyle}`,
+    desc: `pd-desc-body pd-desc-${l.descStyle}`,
+    sticky: l.stickyBar,
+  };
 };
 
-/* ---------- শিরোনাম ---------- */
-export const TITLE_CLASS = {
-  stacked: 'text-[19px] leading-[1.45] sm:text-2xl sm:leading-snug',
-  inline: 'text-[19px] leading-[1.45] sm:text-2xl sm:leading-snug',
-  centered: 'text-center text-[19px] leading-[1.45] sm:text-2xl sm:leading-snug',
+/** বর্ণনার টেক্সটকে বুলেট তালিকায় ভাঙে। */
+export const toBullets = (text) => {
+  if (!text) return [];
+  return String(text)
+    .split(/\n+/)
+    .map((s) => s.replace(/^[\s•\-*]+/, '').trim())
+    .filter(Boolean);
 };
-
-/* ---------- দাম ---------- */
-export const PRICE_CLASS = {
-  inline: 'flex flex-wrap items-end gap-x-2.5 gap-y-1',
-  stacked: 'flex flex-col items-start gap-1',
-  boxed: 'flex flex-wrap items-end gap-x-2.5 gap-y-1 rounded-field bg-surface2 px-3 py-2.5',
-};
-
-/* ---------- বাটন ---------- */
-export const BUTTON_CLASS = {
-  split: 'flex gap-2',
-  stacked: 'flex flex-col gap-2',
-  full: 'flex flex-col gap-2',
-};
-
-/* ---------- বর্ণনা ---------- */
-export const DESC_CLASS = {
-  plain: '',
-  card: 'rounded-field bg-surface2 p-3.5',
-  bullets: '',
-};
-
-/**
- * টেক্সট → বুলেট লাইন
- * ডেটাবেসে বর্ণনা এক প্যারাগ্রাফে লেখা থাকলেও ভেঙে সুন্দর তালিকা হয়।
- */
-export function toBullets(text) {
-  const raw = String(text || '').trim();
-  if (!raw) return [];
-
-  const lines = raw
-    .split(/\r?\n|(?<=[।.!?])\s+/)
-    .map((s) => s.replace(/^[-•*\d.)\s]+/, '').trim())
-    .filter((s) => s.length > 2);
-
-  return lines.length > 1 ? lines : [];
-}

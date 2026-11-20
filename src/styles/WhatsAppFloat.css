@@ -1,0 +1,37 @@
+/* WhatsAppFloat.css — ভাসমান WhatsApp বাটনের স্টাইল
+ * ------------------------------------------------------------
+ * বসানোর পাথ:  src/styles/WhatsAppFloat.css
+ *
+ * মোবাইলে কনটেন্ট ঢেকে না ফেলার ব্যবস্থা:
+ *   • বাটন ছোট (52px), ডান-নিচে
+ *   • bottom-এ safe-area-inset যোগ — নচ/হোম-বারের উপরে থাকে
+ *   • body-তে নিচে সমান padding (নিচের রুল) — ফুটারের শেষ লাইন ঢাকা পড়ে না
+ */
+
+.wa-float {
+  position: fixed;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 40;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  height: 52px;
+  padding: 0 16px 0 14px;
+  border-radius: 999px;
+
+  background: #25d366;
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28), 0 2px 6px rgba(37, 211, 102, 0.35);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.wa-float svg {
+  width: 24px;

@@ -1,9 +1,10 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* ==========================================================
-   index.css — v21
+   index.css — v22
    ----------------------------------------------------------
    এখানে :root-এ সব থিম টোকেনের ডিফল্ট মান বসানো হয়েছে।
 
@@ -100,8 +101,13 @@ canvas {
 
   .input {
     @apply w-full bg-surface2 border border-line rounded-field px-3.5 py-2.5 text-sm text-ink
-      placeholder:text-ink-muted/60 focus:outline-none focus:border-accent transition-colors;
+      focus:outline-none focus:border-accent transition-colors;
   }
+  .input::placeholder {
+    color: var(--muted);
+    opacity: 0.6;
+  }
+
   .label {
     @apply block text-sm font-medium text-ink-muted mb-1.5;
   }

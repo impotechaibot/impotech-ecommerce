@@ -1,22 +1,31 @@
 /**
- * ProductDetail.jsx — ইম্পোটেক প্রোডাক্ট পেজ (v21)
+ * ProductDetail.jsx — ইম্পোটেক প্রোডাক্ট পেজ (v23)
  * ------------------------------------------------------------
  * বসানোর পাথ:  src/pages/ProductDetail.jsx   (রিপ্লেস)
  *
- * v21-এ কী বদলেছে (থিম ফিক্স):
- *   ১. সব হার্ডকোড রঙ সরানো — bg-[#f6f7f8], bg-white, text-slate-*,
- *      border-slate-*, bg-amber-500, bg-slate-900 — সব বাদ।
- *      এখন src/styles/ProductDetail.css-এর pd-* ক্লাস ব্যবহার হচ্ছে,
- *      যেগুলোর সব রঙ var(--accent) / var(--bg) / var(--surface) /
- *      var(--line) / var(--text) / var(--muted) থেকে আসে।
- *      ফলে অ্যাডমিনে থিম বদলালে এই পেজেও বদলায়।
- *   ২. '../styles/ProductDetail.css' import যোগ করা হয়েছে
- *      (আগে ফাইলটা রিপোতে ছিল, কিন্তু কোথাও import করা ছিল না —
- *       তাই মৃত কোড ছিল)।
- *   ৩. মোবাইল লেআউট v18-এর ডিজাইনই রাখা হয়েছে — স্পেসিং, প্যাডিং,
- *      ফন্ট সাইজ, লাইন হাইট, সেকশনের ক্রম, বাটনের উচ্চতা (৪৮px),
- *      ছবির অনুপাত, বর্ডার/শ্যাডো — সব অপরিবর্তিত।
- *      ডেস্কটপ (≥900px) আগের দুই-কলাম লেআউট।
+ * v23-এ কী বদলেছে (WhatsApp ফিক্স):
+ *   WhatsApp-এর wa.me লিংকে কান্ট্রি কোড ছাড়া নাম্বার কাজ করে না —
+ *   "Couldn't look up phone number 01884332067 because it's either
+ *    missing a country code or has the wrong one" এরর আসে।
+ *   আগে কোড ছিল:
+ *       const waNumber = String(contact.whatsapp || phone).replace(/[^0-9]/g, '');
+ *   → শুধু ডিজিট রাখত, কিন্তু 01884332067-এর শুরুতে থাকা 0 সরাত না।
+ *   এখন src/lib/whatsapp.js-এর waLink() ব্যবহার হচ্ছে, যা
+ *   01884332067 → 8801884332067 (কান্ট্রি কোডসহ) বানায়।
+ *   নাম্বার অবৈধ হলে বাটনটাই রেন্ডার হয় না (ভাঙা লিংক নয়)।
+ *   rel="noreferrer" → rel="noopener noreferrer"।
+ *
+ * v21-এর থিম ফিক্স অপরিবর্তিত:
+ *   সব হার্ডকোড রঙ সরানো — bg-[#f6f7f8], bg-white, text-slate-*,
+ *   border-slate-*, bg-amber-500, bg-slate-900 — সব বাদ।
+ *   এখন src/styles/ProductDetail.css-এর pd-* ক্লাস ব্যবহার হচ্ছে,
+ *   যেগুলোর সব রঙ var(--accent) / var(--bg) / var(--surface) /
+ *   var(--line) / var(--text) / var(--muted) থেকে আসে।
+ *   '../styles/ProductDetail.css' import যোগ করা হয়েছে।
+ *   মোবাইল লেআউট v18-এর ডিজাইনই রাখা হয়েছে — স্পেসিং, প্যাডিং,
+ *   ফন্ট সাইজ, লাইন হাইট, সেকশনের ক্রম, বাটনের উচ্চতা (44px),
+ *   ছবির অনুপাত, বর্ডার/শ্যাডো — সব অপরিবর্তিত।
+ *   ডেস্কটপ (≥900px) আগের দুই-কলাম লেআউট।
  *
  * v14-এর সব ফিক্স অক্ষত:
  *   settings.contact.phone, localdb.insert('reviews', ...),
@@ -44,6 +53,7 @@ import { localdb } from '../lib/localdb.js';
 import { supabase } from '../lib/supabase.js';
 import { money, discountPercent, stockStatus, dateBn, toBn } from '../lib/format.js';
 import { productJsonLd } from '../lib/seo.js';
+import { waLink, telLink } from '../lib/whatsapp.js';
 import ProductCard from '../components/ProductCard.jsx';
 import Seo from '../components/Seo.jsx';
 import Loader from '../components/Loader.jsx';
@@ -193,10 +203,18 @@ export default function ProductDetail() {
     );
   }
 
-  /* v14 ফিক্স: ফোন নম্বর settings.contact-এ থাকে, general-এ নয় */
+  /* v14 ফিক্স: ফোন নাম্বার settings.contact-এ থাকে, general-এ নয় */
   const contact = settings?.contact || {};
   const phone = contact.phone || '';
-  const waNumber = String(contact.whatsapp || phone).replace(/[^0-9]/g, '');
+
+  /* v23 ফিক্স: wa.me লিংকে কান্ট্রি কোড ছাড়া নাম্বার কাজ করে না।
+     waLink() নিজেই 01884332067 → 8801884332067 বানায়।
+     নাম্বার অবৈধ হলে খালি স্ট্রিং — তখন বাটনটাই দেখাবে না। */
+  const waHref = waLink(
+    contact.whatsapp || phone,
+    `আমি এই পণ্যটি নিতে চাই: ${product.name_bn || product.name}`
+  );
+  const callHref = telLink(phone);
 
   const add = () => {
     if (Number(product.stock || 0) <= 0) {
@@ -478,22 +496,18 @@ export default function ProductDetail() {
 
               {/* WhatsApp / কল */}
               <div className="pd-contact" style={{ marginTop: 8 }}>
-                <a
-                  href={
-                    waNumber
-                      ? `https://wa.me/${waNumber}?text=${encodeURIComponent(
-                          `আমি এই পণ্যটি নিতে চাই: ${product.name_bn || product.name}`
-                        )}`
-                      : '#'
-                  }
-                  target="_blank"
-                  rel="noreferrer"
-                  className="pd-wa"
-                >
-                  <MessageCircle size={15} /> WhatsApp-এ অর্ডার
-                </a>
-                {phone && (
-                  <a href={`tel:${phone}`} className="pd-call">
+                {waHref && (
+                  <a
+                    href={waHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="pd-wa"
+                  >
+                    <MessageCircle size={15} /> WhatsApp-এ অর্ডার
+                  </a>
+                )}
+                {callHref && (
+                  <a href={callHref} className="pd-call">
                     <Phone size={15} /> কল করুন
                   </a>
                 )}

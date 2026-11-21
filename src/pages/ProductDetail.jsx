@@ -1,43 +1,9 @@
+
 /**
  * ProductDetail.jsx — ইম্পোটেক প্রোডাক্ট পেজ (v23)
  * ------------------------------------------------------------
- * বসানোর পাথ:  src/pages/ProductDetail.jsx   (রিপ্লেস)
- *
- * v23-এ কী বদলেছে (WhatsApp ফিক্স):
- *   WhatsApp-এর wa.me লিংকে কান্ট্রি কোড ছাড়া নাম্বার কাজ করে না —
- *   "Couldn't look up phone number 01884332067 because it's either
- *    missing a country code or has the wrong one" এরর আসে।
- *   আগে কোড ছিল:
- *       const waNumber = String(contact.whatsapp || phone).replace(/[^0-9]/g, '');
- *   → শুধু ডিজিট রাখত, কিন্তু 01884332067-এর শুরুতে থাকা 0 সরাত না।
- *   এখন src/lib/whatsapp.js-এর waLink() ব্যবহার হচ্ছে, যা
- *   01884332067 → 8801884332067 (কান্ট্রি কোডসহ) বানায়।
- *   নাম্বার অবৈধ হলে বাটনটাই রেন্ডার হয় না (ভাঙা লিংক নয়)।
- *   rel="noreferrer" → rel="noopener noreferrer"।
- *
- * v21-এর থিম ফিক্স অপরিবর্তিত:
- *   সব হার্ডকোড রঙ সরানো — bg-[#f6f7f8], bg-white, text-slate-*,
- *   border-slate-*, bg-amber-500, bg-slate-900 — সব বাদ।
- *   এখন src/styles/ProductDetail.css-এর pd-* ক্লাস ব্যবহার হচ্ছে,
- *   যেগুলোর সব রঙ var(--accent) / var(--bg) / var(--surface) /
- *   var(--line) / var(--text) / var(--muted) থেকে আসে।
- *   '../styles/ProductDetail.css' import যোগ করা হয়েছে।
- *   মোবাইল লেআউট v18-এর ডিজাইনই রাখা হয়েছে — স্পেসিং, প্যাডিং,
- *   ফন্ট সাইজ, লাইন হাইট, সেকশনের ক্রম, বাটনের উচ্চতা (44px),
- *   ছবির অনুপাত, বর্ডার/শ্যাডো — সব অপরিবর্তিত।
- *   ডেস্কটপ (≥900px) আগের দুই-কলাম লেআউট।
- *
- * v14-এর সব ফিক্স অক্ষত:
- *   settings.contact.phone, localdb.insert('reviews', ...),
- *   Array.isArray গার্ড, বাংলা অঙ্ক, একক রিভিউ কাউন্ট,
- *   useNavigate, জুম মোডালের সরাসরি onClick।
- *
- * অপরিবর্তিত (গুরুত্বপূর্ণ):
- *   ভিডিও প্লে মোড — autoPlay + muted + loop + playsInline +
- *   controls={false}, নিজের মিউট বাটন, একাধিক ভিডিওর থাম্বনেইল।
- *   ফ্রি ডেলিভারি ব্যাজ (product.free_delivery === true)।
- *   হাব-ভিত্তিক ডেলিভারি চার্জ lib/delivery.js ও Checkout.jsx-এ —
- *   এই ফাইলে ছোঁয়া হয়নি।
+ * WhatsApp country-code fix, theme CSS, mobile/desktop layout,
+ * reviews, video, bundle, wishlist, cart, zoom and related products.
  * ------------------------------------------------------------
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -64,9 +30,10 @@ const SITE_URL = import.meta.env.VITE_SITE_URL || 'https://impotech.sellsull.com
 /* অ্যারে না হলে নিরাপদে খালি অ্যারে */
 const asArray = (v) => (Array.isArray(v) ? v : []);
 
-/* ছোট তারকা সারি — CSS-এর .stars / .off ব্যবহার করে */
+/* ছোট তারকা সারি */
 function Stars({ value = 0, size = 14 }) {
   const v = Math.round(Number(value) || 0);
+
   return (
     <span className="stars">
       {[1, 2, 3, 4, 5].map((i) => (
@@ -84,9 +51,16 @@ function Stars({ value = 0, size = 14 }) {
 export default function ProductDetail() {
   const { slug } = useParams();
   const navigate = useNavigate();
+
   const {
-    products, categories, addToCart, toggleWishlist, wishlist,
-    loading, isSupabaseConfigured, settings,
+    products,
+    categories,
+    addToCart,
+    toggleWishlist,
+    wishlist,
+    loading,
+    isSupabaseConfigured,
+    settings,
   } = useStore();
 
   const [product, setProduct] = useState(null);
@@ -98,19 +72,27 @@ export default function ProductDetail() {
   const [zoom, setZoom] = useState(false);
   const [tab, setTab] = useState('desc');
   const [muted, setMuted] = useState(true);
-  const [reviewForm, setReviewForm] = useState({ name: '', text: '', rating: 5 });
+  const [reviewForm, setReviewForm] = useState({
+    name: '',
+    text: '',
+    rating: 5,
+  });
   const [submitting, setSubmitting] = useState(false);
+
   const videoRef = useRef(null);
 
   /* ---------- প্রোডাক্ট লোড ---------- */
   useEffect(() => {
-    const found = products.find((p) => p.slug === slug || p.id === slug) || null;
+    const found =
+      products.find((p) => p.slug === slug || p.id === slug) || null;
+
     setProduct(found);
     setActiveImg(0);
     setActiveVideo(0);
     setQty(1);
     setVariant('');
     setTab('desc');
+
     if (found) {
       try {
         setReviews(localdb.listReviews(found.id) || []);
@@ -120,67 +102,110 @@ export default function ProductDetail() {
     }
   }, [slug, products, isSupabaseConfigured]);
 
-  const images = useMemo(() => asArray(product?.images).filter(Boolean), [product]);
-  const videos = useMemo(() => asArray(product?.videos).filter(Boolean), [product]);
-  const off = product ? discountPercent(product.price, product.old_price) : 0;
-  const stock = product ? stockStatus(product.stock) : { label: '', tone: 'in' };
-  const wished = product ? asArray(wishlist).some((w) => w.id === product.id) : false;
+  const images = useMemo(
+    () => asArray(product?.images).filter(Boolean),
+    [product]
+  );
 
-  /* v11: এই প্রোডাক্টে ফ্রি ডেলিভারি চালু কি না (কলাম না থাকলে false) */
+  const videos = useMemo(
+    () => asArray(product?.videos).filter(Boolean),
+    [product]
+  );
+
+  const off = product
+    ? discountPercent(product.price, product.old_price)
+    : 0;
+
+  const stock = product
+    ? stockStatus(product.stock)
+    : { label: '', tone: 'in' };
+
+  const wished = product
+    ? asArray(wishlist).some((w) => w.id === product.id)
+    : false;
+
+  /* ফ্রি ডেলিভারি */
   const freeDelivery = product?.free_delivery === true;
 
-  /* ক্যাটাগরির নাম — products-এ join না থাকলেও কাজ করবে */
+  /* ক্যাটাগরির নাম */
   const category = useMemo(() => {
     if (!product) return null;
+
     if (product.categories) return product.categories;
-    return asArray(categories).find((c) => c.id === product.category_id) || null;
+
+    return (
+      asArray(categories).find((c) => c.id === product.category_id) || null
+    );
   }, [product, categories]);
 
+  /* সম্পর্কিত পণ্য */
   const related = useMemo(
     () =>
       product
         ? asArray(products)
-            .filter((p) => p.category_id === product.category_id && p.id !== product.id)
+            .filter(
+              (p) =>
+                p.category_id === product.category_id &&
+                p.id !== product.id
+            )
             .slice(0, 4)
         : [],
     [products, product]
   );
 
-  /* "একসাথে কেনা হয়" — প্রথম সম্পর্কিত পণ্য */
+  /* একসাথে কেনা হয় */
   const bundleMate = related[0] || null;
+
   const bundleTotal =
     product && bundleMate
       ? Number(product.price || 0) + Number(bundleMate.price || 0)
       : 0;
 
+  /* গড় রেটিং */
   const avgRating = useMemo(() => {
     if (!reviews.length) return Number(product?.rating || 0);
-    return reviews.reduce((s, r) => s + Number(r.rating || 0), 0) / reviews.length;
+
+    return (
+      reviews.reduce((s, r) => s + Number(r.rating || 0), 0) /
+      reviews.length
+    );
   }, [reviews, product]);
 
   /* ৫★ → ১★ বিতরণ */
   const dist = useMemo(() => {
     const d = [0, 0, 0, 0, 0];
+
     reviews.forEach((r) => {
-      const n = Math.min(5, Math.max(1, Math.round(Number(r.rating) || 5)));
+      const n = Math.min(
+        5,
+        Math.max(1, Math.round(Number(r.rating) || 5))
+      );
       d[n - 1] += 1;
     });
+
     return d;
   }, [reviews]);
 
   const totalReviews = reviews.length;
-  /* হেডার ও ট্যাব — একই সোর্স */
   const reviewCount = totalReviews || Number(product?.reviews_count || 0);
+
   const recommendPct = totalReviews
-    ? Math.round((reviews.filter((r) => Number(r.rating) >= 4).length / totalReviews) * 100)
+    ? Math.round(
+        (reviews.filter((r) => Number(r.rating) >= 4).length /
+          totalReviews) *
+          100
+      )
     : 0;
 
-  /* ---------- ভিডিও অটোপ্লে (আগের মোড অপরিবর্তিত) ---------- */
+  /* ---------- ভিডিও অটোপ্লে ---------- */
   useEffect(() => {
     if (tab !== 'video') return;
+
     const v = videoRef.current;
     if (!v) return;
+
     v.muted = muted;
+
     const p = v.play();
     if (p && p.catch) p.catch(() => {});
   }, [tab, activeVideo, muted, videos.length]);
@@ -190,12 +215,23 @@ export default function ProductDetail() {
   if (!product) {
     return (
       <div className="pd-page">
-        <div className="container-x pd-wrap" style={{ textAlign: 'center', paddingTop: 80 }}>
-          <h1 className="pd-title" style={{ fontSize: 22 }}>পণ্যটি পাওয়া যায়নি</h1>
+        <div
+          className="container-x pd-wrap"
+          style={{ textAlign: 'center', paddingTop: 80 }}
+        >
+          <h1 className="pd-title" style={{ fontSize: 22 }}>
+            পণ্যটি পাওয়া যায়নি
+          </h1>
+
           <p className="pd-desc" style={{ marginTop: 8 }}>
             সম্ভবত লিংকটি ভুল বা পণ্যটি সরিয়ে ফেলা হয়েছে।
           </p>
-          <Link to="/shop" className="btn-primary" style={{ marginTop: 20, display: 'inline-block' }}>
+
+          <Link
+            to="/shop"
+            className="btn-primary"
+            style={{ marginTop: 20, display: 'inline-block' }}
+          >
             সব পণ্য দেখুন
           </Link>
         </div>
@@ -203,57 +239,78 @@ export default function ProductDetail() {
     );
   }
 
-  /* v14 ফিক্স: ফোন নাম্বার settings.contact-এ থাকে, general-এ নয় */
+  /* ফোন নাম্বার settings.contact-এ */
   const contact = settings?.contact || {};
   const phone = contact.phone || '';
 
-  /* v23 ফিক্স: wa.me লিংকে কান্ট্রি কোড ছাড়া নাম্বার কাজ করে না।
-     waLink() নিজেই 01884332067 → 8801884332067 বানায়।
-     নাম্বার অবৈধ হলে খালি স্ট্রিং — তখন বাটনটাই দেখাবে না। */
+  /* WhatsApp country code fix */
   const waHref = waLink(
     contact.whatsapp || phone,
     `আমি এই পণ্যটি নিতে চাই: ${product.name_bn || product.name}`
   );
+
   const callHref = telLink(phone);
 
+  /* ---------- কার্টে যোগ ---------- */
   const add = () => {
     if (Number(product.stock || 0) <= 0) {
       toast.error('পণ্যটি স্টকে নেই');
       return;
     }
+
     addToCart(product, qty, variant);
     toast.success('কার্টে যোগ হয়েছে');
   };
 
+  /* ---------- এখনই কিনুন ---------- */
   const buyNow = () => {
     if (Number(product.stock || 0) <= 0) {
       toast.error('পণ্যটি স্টকে নেই');
       return;
     }
+
     addToCart(product, qty, variant);
     navigate('/checkout');
   };
 
+  /* ---------- Wishlist ---------- */
   const wish = () => {
     toggleWishlist(product);
-    toast.success(wished ? 'উইশলিস্ট থেকে সরানো হয়েছে' : 'উইশলিস্টে যোগ হয়েছে');
+    toast.success(
+      wished ? 'উইশলিস্ট থেকে সরানো হয়েছে' : 'উইশলিস্টে যোগ হয়েছে'
+    );
   };
 
+  /* ---------- Bundle ---------- */
   const addBundle = () => {
     if (Number(product.stock || 0) <= 0) {
       toast.error('পণ্যটি স্টকে নেই');
       return;
     }
+
     addToCart(product, qty, variant);
-    if (bundleMate) addToCart(bundleMate, 1, '');
+
+    if (bundleMate) {
+      addToCart(bundleMate, 1, '');
+    }
+
     toast.success('দুটোই কার্টে যোগ হয়েছে');
   };
 
+  /* ---------- রিভিউ সাবমিট ---------- */
   const submitReview = async (e) => {
     e.preventDefault();
-    if (!reviewForm.name.trim()) return toast.error('আপনার নাম লিখুন');
-    if (!reviewForm.text.trim()) return toast.error('রিভিউ লিখুন');
+
+    if (!reviewForm.name.trim()) {
+      return toast.error('আপনার নাম লিখুন');
+    }
+
+    if (!reviewForm.text.trim()) {
+      return toast.error('রিভিউ লিখুন');
+    }
+
     setSubmitting(true);
+
     try {
       const payload = {
         product_id: product.id,
@@ -264,16 +321,23 @@ export default function ProductDetail() {
       };
 
       if (isSupabaseConfigured) {
-        const { error } = await supabase.from('reviews').insert(payload);
+        const { error } = await supabase
+          .from('reviews')
+          .insert(payload);
+
         if (error) throw error;
       } else {
-        /* v14 ফিক্স: localdb-তে addReview নেই — insert('reviews', ...) ব্যবহার */
         localdb.insert('reviews', payload);
         setReviews(localdb.listReviews(product.id) || []);
       }
 
       toast.success('রিভিউ পাঠানো হয়েছে — অনুমোদনের পর দেখা যাবে');
-      setReviewForm({ name: '', text: '', rating: 5 });
+
+      setReviewForm({
+        name: '',
+        text: '',
+        rating: 5,
+      });
     } catch (err) {
       toast.error(err?.message || 'রিভিউ পাঠানো যায়নি');
     } finally {
@@ -301,6 +365,7 @@ export default function ProductDetail() {
           <Link to="/">হোম</Link>
           <ChevronRight size={12} />
           <Link to="/shop">শপ</Link>
+
           {category && (
             <>
               <ChevronRight size={12} />
@@ -309,8 +374,11 @@ export default function ProductDetail() {
               </Link>
             </>
           )}
+
           <ChevronRight size={12} />
-          <span className="crumb-now">{product.name_bn || product.name}</span>
+          <span className="crumb-now">
+            {product.name_bn || product.name}
+          </span>
         </nav>
 
         {/* ---------- মূল কার্ড: গ্যালারি + তথ্য ---------- */}
@@ -325,6 +393,7 @@ export default function ProductDetail() {
                       src={images[activeImg]}
                       alt={product.name_bn || product.name}
                     />
+
                     <button
                       type="button"
                       onClick={() => setZoom(true)}
@@ -333,19 +402,27 @@ export default function ProductDetail() {
                     >
                       <ZoomIn size={16} />
                     </button>
+
                     {images.length > 1 && (
                       <>
                         <button
                           type="button"
-                          onClick={() => setActiveImg((v) => (v - 1 + images.length) % images.length)}
+                          onClick={() =>
+                            setActiveImg(
+                              (v) => (v - 1 + images.length) % images.length
+                            )
+                          }
                           className="pd-nav prev"
                           aria-label="আগের ছবি"
                         >
                           <ChevronLeft size={17} />
                         </button>
+
                         <button
                           type="button"
-                          onClick={() => setActiveImg((v) => (v + 1) % images.length)}
+                          onClick={() =>
+                            setActiveImg((v) => (v + 1) % images.length)
+                          }
                           className="pd-nav next"
                           aria-label="পরের ছবি"
                         >
@@ -358,8 +435,13 @@ export default function ProductDetail() {
                   <div className="pd-noimg">ছবি নেই</div>
                 )}
 
-                {off > 0 && <span className="pd-discount">-{toBn(off)}%</span>}
-                {stock.tone === 'out' && <span className="pd-out">স্টক শেষ</span>}
+                {off > 0 && (
+                  <span className="pd-discount">-{toBn(off)}%</span>
+                )}
+
+                {stock.tone === 'out' && (
+                  <span className="pd-out">স্টক শেষ</span>
+                )}
               </div>
 
               {/* থাম্বনেইল */}
@@ -382,48 +464,73 @@ export default function ProductDetail() {
             {/* ===== ডান: তথ্য ===== */}
             <div className="pd-info">
               {category && (
-                <p className="pd-cat">{category.name_bn || category.name}</p>
+                <p className="pd-cat">
+                  {category.name_bn || category.name}
+                </p>
               )}
 
               <h1 className="pd-title" style={{ fontSize: 20, marginTop: 4 }}>
                 {product.name_bn || product.name}
               </h1>
-              {product.name_bn && product.name && product.name_bn !== product.name && (
-                <p className="pd-en">{product.name}</p>
-              )}
+
+              {product.name_bn &&
+                product.name &&
+                product.name_bn !== product.name && (
+                  <p className="pd-en">{product.name}</p>
+                )}
 
               {/* রেটিং */}
               <div className="pd-rating" style={{ marginTop: 8 }}>
                 <Stars value={avgRating} />
-                <span className="pd-rev">({toBn(reviewCount)} রিভিউ)</span>
-                {product.badge && <span className="pd-tag accent">{product.badge}</span>}
+                <span className="pd-rev">
+                  ({toBn(reviewCount)} রিভিউ)
+                </span>
+                {product.badge && (
+                  <span className="pd-tag accent">{product.badge}</span>
+                )}
               </div>
 
               {/* দাম */}
               <div className="pd-price" style={{ marginTop: 12 }}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 8 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'flex-end',
+                    gap: 8,
+                  }}
+                >
                   <b>{money(product.price)}</b>
-                  {Number(product.old_price || 0) > Number(product.price || 0) && (
+
+                  {Number(product.old_price || 0) >
+                    Number(product.price || 0) && (
                     <>
                       <s>{money(product.old_price)}</s>
-                      <span className="pd-save">সাশ্রয় {toBn(off)}%</span>
+                      <span className="pd-save">
+                        সাশ্রয় {toBn(off)}%
+                      </span>
                     </>
                   )}
                 </div>
               </div>
 
               {/* স্টক */}
-              <p className={`pd-stock ${stock.tone}`} style={{ marginTop: 8 }}>
+              <p
+                className={`pd-stock ${stock.tone}`}
+                style={{ marginTop: 8 }}
+              >
                 ● {stock.label}
               </p>
 
-              {/* v11: ফ্রি ডেলিভারি */}
+              {/* ফ্রি ডেলিভারি */}
               {freeDelivery && (
                 <div className="pd-free" style={{ marginTop: 10 }}>
                   <BadgeCheck size={15} />
                   <div>
                     <b>এই পণ্যে ফ্রি ডেলিভারি</b>
-                    <small>এই পণ্যের ডেলিভারি চার্জ সম্পূর্ণ ফ্রি</small>
+                    <small>
+                      এই পণ্যের ডেলিভারি চার্জ সম্পূর্ণ ফ্রি
+                    </small>
                   </div>
                 </div>
               )}
@@ -439,6 +546,7 @@ export default function ProductDetail() {
               {colors.length > 0 && (
                 <div style={{ marginTop: 14 }}>
                   <p className="pd-label">রঙ / ভ্যারিয়েন্ট</p>
+
                   <div className="pd-color-row">
                     {colors.map((c) => (
                       <button
@@ -457,6 +565,7 @@ export default function ProductDetail() {
               {/* পরিমাণ */}
               <div style={{ marginTop: 14 }}>
                 <p className="pd-label">পরিমাণ</p>
+
                 <div className="pd-qty">
                   <button
                     type="button"
@@ -465,7 +574,9 @@ export default function ProductDetail() {
                   >
                     <Minus size={15} />
                   </button>
+
                   <span>{toBn(qty)}</span>
+
                   <button
                     type="button"
                     onClick={() => setQty((v) => v + 1)}
@@ -477,20 +588,32 @@ export default function ProductDetail() {
               </div>
 
               {/* দুই বাটন */}
-              <div className="pd-buy" style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+              <div
+                className="pd-buy"
+                style={{ display: 'flex', gap: 8, marginTop: 14 }}
+              >
                 <button type="button" onClick={add} className="pd-add">
                   <ShoppingCart size={16} /> কার্টে যোগ করুন
                 </button>
-                <button type="button" onClick={buyNow} className="pd-buynow">
+
+                <button
+                  type="button"
+                  onClick={buyNow}
+                  className="pd-buynow"
+                >
                   এখনই কিনুন
                 </button>
+
                 <button
                   type="button"
                   onClick={wish}
                   className={`pd-wish ${wished ? 'on' : ''}`}
                   aria-label="উইশলিস্ট"
                 >
-                  <Heart size={17} fill={wished ? 'currentColor' : 'none'} />
+                  <Heart
+                    size={17}
+                    fill={wished ? 'currentColor' : 'none'}
+                  />
                 </button>
               </div>
 
@@ -506,6 +629,7 @@ export default function ProductDetail() {
                     <MessageCircle size={15} /> WhatsApp-এ অর্ডার
                   </a>
                 )}
+
                 {callHref && (
                   <a href={callHref} className="pd-call">
                     <Phone size={15} /> কল করুন
@@ -535,13 +659,18 @@ export default function ProductDetail() {
 
         {/* ---------- একসাথে কেনা হয় ---------- */}
         {bundleMate && (
-          <div className="pd-card pd-bundle" style={{ padding: 12, marginTop: 12 }}>
+          <div
+            className="pd-card pd-bundle"
+            style={{ padding: 12, marginTop: 12 }}
+          >
             <h2>একসাথে বেশি কেনা হয়</h2>
+
             <div className="pd-bundle-row">
               <div className="pd-bundle-item">
                 <div className="pd-bundle-img">
                   {images[0] && <img src={images[0]} alt="" />}
                 </div>
+
                 <div>
                   <p>{product.name_bn || product.name}</p>
                   <small>{money(product.price)}</small>
@@ -553,9 +682,13 @@ export default function ProductDetail() {
               <div className="pd-bundle-item">
                 <div className="pd-bundle-img">
                   {asArray(bundleMate.images)[0] && (
-                    <img src={asArray(bundleMate.images)[0]} alt="" />
+                    <img
+                      src={asArray(bundleMate.images)[0]}
+                      alt=""
+                    />
                   )}
                 </div>
+
                 <div>
                   <p>{bundleMate.name_bn || bundleMate.name}</p>
                   <small>{money(bundleMate.price)}</small>
@@ -566,6 +699,7 @@ export default function ProductDetail() {
 
               <div className="pd-bundle-total">
                 <b>{money(bundleTotal)}</b>
+
                 <button type="button" onClick={addBundle}>
                   দুটোই কার্টে নিন
                 </button>
@@ -579,6 +713,310 @@ export default function ProductDetail() {
           <div className="pd-tab-head">
             {[
               { id: 'desc', label: 'বিবরণ' },
-              { id: 'video', label: `ভিডিও${videos.length ? ` (${toBn(videos.length)})` : ''}` },
-              { id: 'reviews', label: `রিভিউ (${toBn(reviewCount)})` },
+              {
+                id: 'video',
+                label: `ভিডিও${videos.length ? ` (${toBn(videos.length)})` : ''}`,
+              },
+              {
+                id: 'reviews',
+                label: `রিভিউ (${toBn(reviewCount)})`,
+              },
             ].map((t) => (
+              <button
+                type="button"
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={tab === t.id ? 'on' : ''}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="pd-tab-body">
+            {/* --- বিবরণ --- */}
+            {tab === 'desc' && (
+              <div className="pd-desc-body">
+                <h3>পণ্যের বিবরণ</h3>
+
+                <p className="pd-long">
+                  {product.description ||
+                    'এই পণ্যের বিস্তারিত বর্ণনা শীঘ্রই যোগ করা হবে।'}
+                </p>
+
+                {features.length > 0 && (
+                  <>
+                    <h3>প্রধান বৈশিষ্ট্য</h3>
+
+                    <ul className="pd-feat-list">
+                      {features.map((f, i) => (
+                        <li key={i}>
+                          <Check size={14} />
+                          <span>{f}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+
+                {product.tag && (
+                  <p className="pd-tagline">ট্যাগ: {product.tag}</p>
+                )}
+              </div>
+            )}
+
+            {/* --- ভিডিও --- */}
+            {tab === 'video' && (
+              <div>
+                {videos.length === 0 ? (
+                  <div className="pd-empty">
+                    এই পণ্যের কোনো ভিডিও এখনো যোগ করা হয়নি।
+                  </div>
+                ) : (
+                  <>
+                    <div className="pd-video-stage">
+                      <video
+                        ref={videoRef}
+                        key={videos[activeVideo]}
+                        src={videos[activeVideo]}
+                        className="pd-main-video"
+                        muted={muted}
+                        autoPlay
+                        loop
+                        playsInline
+                        controls={false}
+                        onClick={(e) => {
+                          const v = e.currentTarget;
+
+                          if (v.paused) v.play().catch(() => {});
+                          else v.pause();
+                        }}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => setMuted((v) => !v)}
+                        className="pd-mute"
+                        aria-label={muted ? 'সাউন্ড চালু' : 'সাউন্ড বন্ধ'}
+                      >
+                        {muted ? (
+                          <VolumeX size={17} />
+                        ) : (
+                          <Volume2 size={17} />
+                        )}
+                      </button>
+                    </div>
+
+                    {videos.length > 1 && (
+                      <div
+                        className="pd-thumbs pd-vthumbs"
+                        style={{ marginTop: 10 }}
+                      >
+                        {videos.map((v, i) => (
+                          <button
+                            type="button"
+                            key={i}
+                            onClick={() => setActiveVideo(i)}
+                            className={i === activeVideo ? 'on' : ''}
+                          >
+                            <video src={v} muted preload="metadata" />
+
+                            <span className="pd-thumb-play">
+                              <Play size={15} />
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* --- রিভিউ --- */}
+            {tab === 'reviews' && (
+              <div>
+                {/* সারসংক্ষেপ */}
+                <div className="pd-rev-sum">
+                  <div className="pd-rev-score">
+                    <b>
+                      {toBn((Math.round(avgRating * 10) / 10).toFixed(1))}
+                    </b>
+
+                    <Stars value={avgRating} size={13} />
+
+                    <small>{toBn(reviewCount)} রিভিউ</small>
+                    <small>{toBn(recommendPct)}% সুপারিশ</small>
+                  </div>
+
+                  <div className="pd-rev-bars">
+                    {[5, 4, 3, 2, 1].map((n) => {
+                      const c = dist[n - 1];
+                      const pct = totalReviews
+                        ? Math.round((c / totalReviews) * 100)
+                        : 0;
+
+                      return (
+                        <div key={n} className="pd-bar-row">
+                          <span>{toBn(n)}★</span>
+
+                          <div className="pd-bar">
+                            <i style={{ width: `${pct}%` }} />
+                          </div>
+
+                          <em>{toBn(c)}</em>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* রিভিউ ফর্ম */}
+                <form onSubmit={submitReview} className="pd-rev-form">
+                  <h3>আপনার রিভিউ লিখুন</h3>
+
+                  <div className="pd-rev-fields">
+                    <input
+                      value={reviewForm.name}
+                      onChange={(e) =>
+                        setReviewForm((f) => ({
+                          ...f,
+                          name: e.target.value,
+                        }))
+                      }
+                      placeholder="আপনার নাম"
+                    />
+
+                    <select
+                      value={reviewForm.rating}
+                      onChange={(e) =>
+                        setReviewForm((f) => ({
+                          ...f,
+                          rating: Number(e.target.value),
+                        }))
+                      }
+                    >
+                      <option value={5}>৫ — চমৎকার</option>
+                      <option value={4}>৪ — ভালো</option>
+                      <option value={3}>৩ — মাঝারি</option>
+                      <option value={2}>২ — খারাপ</option>
+                      <option value={1}>১ — খুব খারাপ</option>
+                    </select>
+                  </div>
+
+                  <textarea
+                    value={reviewForm.text}
+                    onChange={(e) =>
+                      setReviewForm((f) => ({
+                        ...f,
+                        text: e.target.value,
+                      }))
+                    }
+                    placeholder="পণ্যটি সম্পর্কে আপনার মতামত লিখুন"
+                    rows={3}
+                  />
+
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="pd-rev-submit"
+                  >
+                    {submitting ? 'পাঠানো হচ্ছে…' : 'রিভিউ জমা দিন'}
+                  </button>
+                </form>
+
+                {/* রিভিউ তালিকা */}
+                <div className="pd-rev-list">
+                  {reviews.length === 0 ? (
+                    <p className="pd-tagline">এখনো কোনো রিভিউ নেই।</p>
+                  ) : (
+                    reviews.map((r) => (
+                      <div key={r.id} className="pd-rev-item">
+                        <div className="pd-rev-head">
+                          <div className="pd-rev-who">
+                            <span className="pd-avatar">
+                              {(r.customer_name || '?').charAt(0)}
+                            </span>
+
+                            <div>
+                              <p>{r.customer_name}</p>
+                              <small>{dateBn(r.created_at)}</small>
+                            </div>
+                          </div>
+
+                          <Stars value={r.rating} size={12} />
+                        </div>
+
+                        <p className="pd-rev-text">
+                          {r.text || r.comment}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ---------- সম্পর্কিত পণ্য ---------- */}
+        {related.length > 0 && (
+          <section style={{ marginTop: 18 }}>
+            <div className="pd-related-head">
+              <h2>সম্পর্কিত পণ্য</h2>
+              <Link to="/shop">আরও পণ্য →</Link>
+            </div>
+
+            <div className="pd-related-grid">
+              {related.map((p) => (
+                <ProductCard key={p.id} product={p} />
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+
+      {/* ---------- মোবাইল স্টিকি বার ---------- */}
+      <div className="pd-sticky">
+        <div className="pd-sticky-price">
+          <b>{money(product.price)}</b>
+
+          {Number(product.old_price || 0) >
+            Number(product.price || 0) && (
+            <s>{money(product.old_price)}</s>
+          )}
+        </div>
+
+        <button type="button" onClick={add} className="pd-sticky-add">
+          <ShoppingCart size={15} /> কার্টে যোগ
+        </button>
+
+        <button type="button" onClick={buyNow} className="pd-sticky-buy">
+          কিনুন
+        </button>
+      </div>
+
+      {/* ---------- জুম মোডাল ---------- */}
+      {zoom && images[activeImg] && (
+        <div
+          className="pd-zoom-wrap"
+          onClick={() => setZoom(false)}
+        >
+          <button
+            type="button"
+            onClick={() => setZoom(false)}
+            className="pd-zoom-close"
+            aria-label="বন্ধ"
+          >
+            <X size={21} />
+          </button>
+
+          <img
+            src={images[activeImg]}
+            alt={product.name_bn || product.name}
+          />
+        </div>
+      )}
+    </div>
+  );
+}

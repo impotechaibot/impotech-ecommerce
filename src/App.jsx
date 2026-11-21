@@ -21,6 +21,7 @@ import Contact from './pages/Contact.jsx';
 import LandingPage from './pages/LandingPage.jsx';
 import NotFound from './pages/NotFound.jsx';
 import Admin from './pages/Admin.jsx';
+import './styles/CheckoutTheme.css';
 
 /** রুট বদলালে উপরে স্ক্রল */
 function ScrollToTop() {
@@ -42,7 +43,14 @@ export default function App() {
           <Route path="/shop" element={<Shop />} />
           <Route path="/product/:slug" element={<ProductDetail />} />
           <Route path="/cart" element={<Cart />} />
-          <Route path="/checkout" element={<Checkout />} />
+          <Route
+            path="/checkout"
+            element={
+              <div className="co-page">
+                <Checkout />
+              </div>
+            }
+          />
           <Route path="/order-success/:code" element={<OrderSuccess />} />
           <Route path="/track" element={<Track />} />
           <Route path="/account" element={<Account />} />

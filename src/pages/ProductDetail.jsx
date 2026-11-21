@@ -1,9 +1,17 @@
 
 /**
- * ProductDetail.jsx — ইম্পোটেক প্রোডাক্ট পেজ (v23)
+ * ProductDetail.jsx — ImpoTech Product Page (v24)
  * ------------------------------------------------------------
- * WhatsApp country-code fix, theme CSS, mobile/desktop layout,
- * reviews, video, bundle, wishlist, cart, zoom and related products.
+ * v24:
+ * - YouTube video support
+ * - Direct video URL support (MP4 / WebM etc.)
+ * - youtube.com/watch, youtu.be, Shorts, embed URLs
+ * - Mixed YouTube + direct videos supported
+ * - YouTube thumbnail support
+ * - Direct video playback retained
+ * - WhatsApp country code fix retained
+ * - Theme CSS retained
+ * - Reviews, Bundle, Wishlist, Cart, Zoom retained
  * ------------------------------------------------------------
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -29,6 +37,69 @@ const SITE_URL = import.meta.env.VITE_SITE_URL || 'https://impotech.sellsull.com
 
 /* অ্যারে না হলে নিরাপদে খালি অ্যারে */
 const asArray = (v) => (Array.isArray(v) ? v : []);
+
+/* ------------------------------------------------------------
+   YouTube URL থেকে ভিডিও ID বের করা
+   সাপোর্ট:
+   - youtube.com/watch?v=ID
+   - youtu.be/ID
+   - youtube.com/shorts/ID
+   - youtube.com/embed/ID
+   - youtube.com/live/ID
+------------------------------------------------------------ */
+function getYouTubeId(value) {
+  if (!value || typeof value !== 'string') return null;
+
+  const input = value.trim();
+
+  try {
+    const url = new URL(
+      input.startsWith('http') ? input : `https://${input}`
+    );
+
+    const host = url.hostname.replace(/^www\./, '').toLowerCase();
+
+    if (host === 'youtu.be') {
+      return url.pathname.split('/').filter(Boolean)[0] || null;
+    }
+
+    if (
+      host === 'youtube.com' ||
+      host === 'm.youtube.com' ||
+      host === 'music.youtube.com'
+    ) {
+      if (url.pathname === '/watch') {
+        return url.searchParams.get('v');
+      }
+
+      const parts = url.pathname.split('/').filter(Boolean);
+
+      if (
+        ['shorts', 'embed', 'live', 'v'].includes(parts[0]) &&
+        parts[1]
+      ) {
+        return parts[1];
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+/* YouTube ভিডিও কি না */
+function isYouTubeVideo(value) {
+  return Boolean(getYouTubeId(value));
+}
+
+/* YouTube thumbnail */
+function getYouTubeThumbnail(value) {
+  const id = getYouTubeId(value);
+  if (!id) return '';
+
+  return `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
+}
 
 /* ছোট তারকা সারি */
 function Stars({ value = 0, size = 14 }) {
@@ -127,7 +198,7 @@ export default function ProductDetail() {
   /* ফ্রি ডেলিভারি */
   const freeDelivery = product?.free_delivery === true;
 
-  /* ক্যাটাগরির নাম */
+  /* ক্যাটাগরি */
   const category = useMemo(() => {
     if (!product) return null;
 
@@ -153,7 +224,7 @@ export default function ProductDetail() {
     [products, product]
   );
 
-  /* একসাথে কেনা হয় */
+  /* Bundle */
   const bundleMate = related[0] || null;
 
   const bundleTotal =
@@ -180,6 +251,7 @@ export default function ProductDetail() {
         5,
         Math.max(1, Math.round(Number(r.rating) || 5))
       );
+
       d[n - 1] += 1;
     });
 
@@ -197,18 +269,36 @@ export default function ProductDetail() {
       )
     : 0;
 
-  /* ---------- ভিডিও অটোপ্লে ---------- */
+  /* ------------------------------------------------------------
+     ভিডিও প্লে
+     YouTube হলে HTML video.play() চালানো হবে না।
+     Direct video হলে আগের play system ব্যবহার হবে।
+  ------------------------------------------------------------ */
   useEffect(() => {
     if (tab !== 'video') return;
 
+    const currentVideo = videos[activeVideo];
+
+    if (!currentVideo) return;
+
+    /* YouTube iframe নিজেই autoplay পরিচালনা করে */
+    if (isYouTubeVideo(currentVideo)) return;
+
+    /* Direct video playback */
     const v = videoRef.current;
+
     if (!v) return;
 
     v.muted = muted;
 
-    const p = v.play();
-    if (p && p.catch) p.catch(() => {});
-  }, [tab, activeVideo, muted, videos.length]);
+    const playPromise = v.play();
+
+    if (playPromise?.catch) {
+      playPromise.catch((error) => {
+        console.warn('Direct video playback failed:', error);
+      });
+    }
+  }, [tab, activeVideo, muted, videos]);
 
   if (loading) return <Loader />;
 
@@ -239,7 +329,7 @@ export default function ProductDetail() {
     );
   }
 
-  /* ফোন নাম্বার settings.contact-এ */
+  /* ফোন নাম্বার */
   const contact = settings?.contact || {};
   const phone = contact.phone || '';
 
@@ -276,6 +366,7 @@ export default function ProductDetail() {
   /* ---------- Wishlist ---------- */
   const wish = () => {
     toggleWishlist(product);
+
     toast.success(
       wished ? 'উইশলিস্ট থেকে সরানো হয়েছে' : 'উইশলিস্টে যোগ হয়েছে'
     );
@@ -381,10 +472,10 @@ export default function ProductDetail() {
           </span>
         </nav>
 
-        {/* ---------- মূল কার্ড: গ্যালারি + তথ্য ---------- */}
+        {/* ---------- মূল কার্ড ---------- */}
         <div className="pd-card" style={{ padding: 12 }}>
           <div className="pd-grid" style={{ gap: 16 }}>
-            {/* ===== বাঁ: গ্যালারি ===== */}
+            {/* ===== গ্যালারি ===== */}
             <div className="pd-gallery">
               <div className="pd-main-img" style={{ aspectRatio: '1 / 1' }}>
                 {images.length > 0 ? (
@@ -461,7 +552,7 @@ export default function ProductDetail() {
               )}
             </div>
 
-            {/* ===== ডান: তথ্য ===== */}
+            {/* ===== তথ্য ===== */}
             <div className="pd-info">
               {category && (
                 <p className="pd-cat">
@@ -482,9 +573,11 @@ export default function ProductDetail() {
               {/* রেটিং */}
               <div className="pd-rating" style={{ marginTop: 8 }}>
                 <Stars value={avgRating} />
+
                 <span className="pd-rev">
                   ({toBn(reviewCount)} রিভিউ)
                 </span>
+
                 {product.badge && (
                   <span className="pd-tag accent">{product.badge}</span>
                 )}
@@ -506,6 +599,7 @@ export default function ProductDetail() {
                     Number(product.price || 0) && (
                     <>
                       <s>{money(product.old_price)}</s>
+
                       <span className="pd-save">
                         সাশ্রয় {toBn(off)}%
                       </span>
@@ -526,6 +620,7 @@ export default function ProductDetail() {
               {freeDelivery && (
                 <div className="pd-free" style={{ marginTop: 10 }}>
                   <BadgeCheck size={15} />
+
                   <div>
                     <b>এই পণ্যে ফ্রি ডেলিভারি</b>
                     <small>
@@ -587,7 +682,7 @@ export default function ProductDetail() {
                 </div>
               </div>
 
-              {/* দুই বাটন */}
+              {/* কার্ট বাটন */}
               <div
                 className="pd-buy"
                 style={{ display: 'flex', gap: 8, marginTop: 14 }}
@@ -646,6 +741,7 @@ export default function ProductDetail() {
                 ].map((b, i) => (
                   <div key={i}>
                     <b.icon size={16} />
+
                     <div>
                       <b>{b.t}</b>
                       <small>{b.s}</small>
@@ -657,7 +753,7 @@ export default function ProductDetail() {
           </div>
         </div>
 
-        {/* ---------- একসাথে কেনা হয় ---------- */}
+        {/* ---------- Bundle ---------- */}
         {bundleMate && (
           <div
             className="pd-card pd-bundle"
@@ -734,7 +830,7 @@ export default function ProductDetail() {
           </div>
 
           <div className="pd-tab-body">
-            {/* --- বিবরণ --- */}
+            {/* ---------- বিবরণ ---------- */}
             {tab === 'desc' && (
               <div className="pd-desc-body">
                 <h3>পণ্যের বিবরণ</h3>
@@ -765,7 +861,7 @@ export default function ProductDetail() {
               </div>
             )}
 
-            {/* --- ভিডিও --- */}
+            {/* ---------- ভিডিও: YouTube + Direct ---------- */}
             {tab === 'video' && (
               <div>
                 {videos.length === 0 ? (
@@ -775,24 +871,51 @@ export default function ProductDetail() {
                 ) : (
                   <>
                     <div className="pd-video-stage">
-                      <video
-                        ref={videoRef}
-                        key={videos[activeVideo]}
-                        src={videos[activeVideo]}
-                        className="pd-main-video"
-                        muted={muted}
-                        autoPlay
-                        loop
-                        playsInline
-                        controls={false}
-                        onClick={(e) => {
-                          const v = e.currentTarget;
+                      {isYouTubeVideo(videos[activeVideo]) ? (
+                        /* YouTube Player */
+                        <iframe
+                          key={`${getYouTubeId(videos[activeVideo])}-${muted}`}
+                          src={`https://www.youtube.com/embed/${getYouTubeId(
+                            videos[activeVideo]
+                          )}?autoplay=1&mute=${muted ? 1 : 0}&playsinline=1&rel=0`}
+                          title={`YouTube Video ${activeVideo + 1}`}
+                          className="pd-main-video"
+                          allow="autoplay; encrypted-media; picture-in-picture"
+                          allowFullScreen
+                          loading="eager"
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            border: 0,
+                          }}
+                        />
+                      ) : (
+                        /* Direct MP4/WebM Video */
+                        <video
+                          ref={videoRef}
+                          key={videos[activeVideo]}
+                          src={videos[activeVideo]}
+                          className="pd-main-video"
+                          muted={muted}
+                          autoPlay
+                          loop
+                          playsInline
+                          controls
+                          onClick={(e) => {
+                            const v = e.currentTarget;
 
-                          if (v.paused) v.play().catch(() => {});
-                          else v.pause();
-                        }}
-                      />
+                            if (v.paused) {
+                              v.play().catch((error) => {
+                                console.warn('Video playback error:', error);
+                              });
+                            } else {
+                              v.pause();
+                            }
+                          }}
+                        />
+                      )}
 
+                      {/* Mute button — YouTube-এ iframe remount করে */}
                       <button
                         type="button"
                         onClick={() => setMuted((v) => !v)}
@@ -807,25 +930,46 @@ export default function ProductDetail() {
                       </button>
                     </div>
 
+                    {/* ভিডিও থাম্বনেইল */}
                     {videos.length > 1 && (
                       <div
                         className="pd-thumbs pd-vthumbs"
                         style={{ marginTop: 10 }}
                       >
-                        {videos.map((v, i) => (
-                          <button
-                            type="button"
-                            key={i}
-                            onClick={() => setActiveVideo(i)}
-                            className={i === activeVideo ? 'on' : ''}
-                          >
-                            <video src={v} muted preload="metadata" />
+                        {videos.map((v, i) => {
+                          const yt = isYouTubeVideo(v);
+                          const thumbnail = yt
+                            ? getYouTubeThumbnail(v)
+                            : '';
 
-                            <span className="pd-thumb-play">
-                              <Play size={15} />
-                            </span>
-                          </button>
-                        ))}
+                          return (
+                            <button
+                              type="button"
+                              key={i}
+                              onClick={() => setActiveVideo(i)}
+                              className={i === activeVideo ? 'on' : ''}
+                              aria-label={`ভিডিও ${i + 1}`}
+                            >
+                              {yt ? (
+                                <img
+                                  src={thumbnail}
+                                  alt={`YouTube ভিডিও ${i + 1}`}
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <video
+                                  src={v}
+                                  muted
+                                  preload="metadata"
+                                />
+                              )}
+
+                              <span className="pd-thumb-play">
+                                <Play size={15} />
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                   </>
@@ -833,7 +977,7 @@ export default function ProductDetail() {
               </div>
             )}
 
-            {/* --- রিভিউ --- */}
+            {/* ---------- রিভিউ ---------- */}
             {tab === 'reviews' && (
               <div>
                 {/* সারসংক্ষেপ */}
@@ -852,6 +996,7 @@ export default function ProductDetail() {
                   <div className="pd-rev-bars">
                     {[5, 4, 3, 2, 1].map((n) => {
                       const c = dist[n - 1];
+
                       const pct = totalReviews
                         ? Math.round((c / totalReviews) * 100)
                         : 0;

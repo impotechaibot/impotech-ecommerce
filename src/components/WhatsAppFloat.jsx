@@ -1,17 +1,3 @@
-/**
- * WhatsAppFloat.jsx — ভাসমান WhatsApp বাটন
- * ------------------------------------------------------------
- * বসানোর পাথ:  src/components/WhatsAppFloat.jsx
- *
- * বৈশিষ্ট্য:
- *   • নাম্বার `waLink()` দিয়ে নরমালাইজ হয় → কান্ট্রি কোডসহ সঠিক wa.me লিংক
- *   • নাম্বার অবৈধ/খালি হলে বাটনটাই রেন্ডার হয় না (ভাঙা লিংক নয়)
- *   • `target="_blank"` + `rel="noopener noreferrer"` — নিরাপদ নতুন ট্যাব
- *   • অ্যাডমিন প্যানেলে (/admin) দেখায় না
- *   • মোবাইলে ছোট গোল বাটন, safe-area-inset মেনে চলে, নিচে ফাঁকা জায়গা
- *     রেখে দেয় বলে কনটেন্ট ঢেকে ফেলে না
- *   • কিবোর্ড দিয়ে ব্যবহারযোগ্য (aria-label + focus ring)
- */
 import { useLocation } from 'react-router-dom';
 import { useStore } from '../context/StoreContext.jsx';
 import { waLink, waDisplay } from '../lib/whatsapp.js';
@@ -32,17 +18,20 @@ export default function WhatsAppFloat() {
 
   const href = waLink(raw, DEFAULT_MESSAGE);
 
-  /* নাম্বার ঠিক না থাকলে ভাঙা লিংক না দিয়ে বাটনটাই লুকিয়ে রাখি */
+  /* নাম্বার ঠিক না থাকলে বাটনটাই লুকিয়ে রাখি */
   if (!href) return null;
 
   const shown = waDisplay(raw);
+
+  /* প্রোডাক্ট পেজে নিচের স্টিকি বারের উপরে তোলা হয় */
+  const lift = pathname.startsWith('/product/');
 
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="wa-float"
+      className={`wa-float${lift ? ' wa-float--lift' : ''}`}
       aria-label={`WhatsApp-এ মেসেজ করুন ${shown}`}
       title={`WhatsApp: ${shown}`}
     >

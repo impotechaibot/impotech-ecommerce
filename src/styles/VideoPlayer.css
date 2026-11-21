@@ -1,0 +1,98 @@
+/* ==========================================================
+   VideoPlayer.css — শেয়ারড ভিডিও প্লেয়ার
+   ProductDetail ও LandingPage দুই জায়গাতেই ব্যবহৃত
+   ========================================================== */
+
+.vp-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+}
+
+.vp-media {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  border: 0;
+}
+
+/* ---------- mute বাটন ---------- */
+.vp-mute {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 3;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(10, 10, 12, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.vp-mute:hover {
+  background: #f0b429;
+  color: #14100a;
+}
+
+/* ---------- বড় play বাটন (autoplay বন্ধ থাকলে) ---------- */
+.vp-play {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  border: 0;
+  cursor: pointer;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.32);
+  transition: background 0.18s ease;
+}
+
+.vp-play:hover {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.vp-play svg {
+  width: 62px;
+  height: 62px;
+  padding: 16px;
+  border-radius: 50%;
+  background: rgba(240, 180, 41, 0.92);
+  color: #14100a;
+  box-sizing: content-box;
+}
+
+/* ---------- এরর স্টেট ---------- */
+.vp-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 20px;
+  text-align: center;
+  color: #f4d9a0;
+  background: #0d0d10;
+}
+
+.vp-error b {
+  font-size: 14px;
+}
+
+.vp-error small {
+  font-size: 12px;
+  color: #9a9aa5;
+  max-width: 34ch;
+  line-height: 1.5;
+}

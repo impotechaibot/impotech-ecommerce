@@ -67,6 +67,13 @@
   }
 }
 
+/* প্রোডাক্ট পেজ: স্টিকি কিনুন-বারের উপরে */
+@media (max-width: 899px) {
+  .wa-float.wa-float--lift {
+    bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 @media print {
   .wa-float {
     display: none !important;

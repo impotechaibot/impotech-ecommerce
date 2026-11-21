@@ -1,12 +1,4 @@
-/* WhatsAppFloat.css — ভাসমান WhatsApp বাটনের স্টাইল
- * ------------------------------------------------------------
- * বসানোর পাথ:  src/styles/WhatsAppFloat.css
- *
- * মোবাইলে কনটেন্ট ঢেকে না ফেলার ব্যবস্থা:
- *   • বাটন ছোট (52px), ডান-নিচে
- *   • bottom-এ safe-area-inset যোগ — নচ/হোম-বারের উপরে থাকে
- *   • body-তে নিচে সমান padding (নিচের রুল) — ফুটারের শেষ লাইন ঢাকা পড়ে না
- */
+/* WhatsAppFloat.css — ভাসমান WhatsApp বাটনের স্টাইল */
 
 .wa-float {
   position: fixed;
@@ -35,3 +27,57 @@
 
 .wa-float svg {
   width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.wa-float:hover {
+  background: #1fbe5b;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.32), 0 3px 8px rgba(37, 211, 102, 0.45);
+}
+
+.wa-float:active {
+  transform: translateY(0);
+}
+
+.wa-float:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  .wa-float {
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    width: 52px;
+    height: 52px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .wa-float-label {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  body {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media print {
+  .wa-float {
+    display: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wa-float {
+    transition: none;
+  }
+  .wa-float:hover {
+    transform: none;
+  }
+}

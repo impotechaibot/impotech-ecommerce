@@ -20,6 +20,7 @@ import Policy from './pages/Policy.jsx';
 import Contact from './pages/Contact.jsx';
 import LandingPage from './pages/LandingPage.jsx';
 import NotFound from './pages/NotFound.jsx';
+import Admin from './pages/Admin.jsx';
 
 /** রুট বদলালে উপরে স্ক্রল */
 function ScrollToTop() {
@@ -53,6 +54,7 @@ export default function App() {
           <Route path="/policy/:slug" element={<Policy />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/lp/:slug" element={<LandingPage />} />
+          <Route path="/admin" element={<Admin />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>

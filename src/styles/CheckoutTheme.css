@@ -1,0 +1,78 @@
+/* চেকআউট পেজকে অ্যাডমিনের থিমের সাথে মেলানো — শুধু .co-page-এর ভেতরে */
+
+.co-page {
+  color: var(--text);
+}
+
+.co-page .bg-white {
+  background: var(--surface-solid);
+}
+.co-page .bg-gray-50,
+.co-page .bg-gray-100 {
+  background: var(--surface-2);
+}
+
+.co-page .border-gray-200 {
+  border-color: var(--line);
+}
+.co-page .border-gray-300 {
+  border-color: var(--line-strong);
+}
+.co-page .border-black {
+  border-color: var(--accent);
+}
+
+.co-page .text-gray-500,
+.co-page .text-gray-600 {
+  color: var(--muted);
+}
+.co-page .text-green-600,
+.co-page .text-green-700 {
+  color: #34d399;
+}
+.co-page .text-red-600,
+.co-page .text-red-700 {
+  color: #f87171;
+}
+.co-page .bg-red-50 {
+  background: rgba(248, 113, 113, 0.12);
+}
+.co-page .border-red-200 {
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.co-page input,
+.co-page textarea,
+.co-page select {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.co-page input::placeholder,
+.co-page textarea::placeholder {
+  color: var(--muted-2);
+}
+.co-page .focus\:border-black:focus {
+  border-color: var(--accent);
+}
+.co-page .focus\:ring-black:focus {
+  --tw-ring-color: var(--accent);
+}
+
+.co-page .accent-black {
+  accent-color: var(--accent);
+}
+
+.co-page .bg-black {
+  background: var(--accent);
+  color: #14100a;
+}
+.co-page .bg-black:hover {
+  background: var(--accent-dark);
+}
+.co-page .bg-black:disabled {
+  background: var(--muted-2);
+  color: var(--surface-solid);
+}
+.co-page .text-white {
+  color: #14100a;
+}

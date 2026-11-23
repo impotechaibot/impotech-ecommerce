@@ -1297,3 +1297,133 @@
     padding: 14px 16px;
   }
 }
+
+/* ==========================================================
+   MediaManager v2 — নতুন অংশ (প্রোগ্রেস, YouTube প্রিভিউ, বাজেট)
+   ========================================================== */
+
+.mm-progress {
+  position: relative;
+  height: 6px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.mm-progress span {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #f0b429, #ffd166);
+  transition: width 0.25s ease;
+}
+
+.mm-vid-yt {
+  position: relative;
+  width: 96px;
+  height: 60px;
+  flex: 0 0 96px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+}
+
+.mm-vid-yt img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mm-vid-play {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+}
+
+.mm-yt-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-radius: 4px;
+  background: rgba(255, 0, 0, 0.16);
+  color: #ff6b6b;
+  vertical-align: middle;
+}
+
+.mm-yt-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mm-yt-preview img {
+  width: 72px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.mm-yt-preview span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #6ee7a8;
+}
+
+.mm-vid-meta small.warn {
+  color: #f0b429;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mm-budget em {
+  display: block;
+  font-style: normal;
+  font-size: 11px;
+  color: var(--ink-muted, #8b8b96);
+  margin-top: 2px;
+}
+
+.mm-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 9px 11px;
+  font-size: 11.5px;
+  line-height: 1.65;
+  border-radius: 9px;
+  background: rgba(240, 180, 41, 0.08);
+  border: 1px solid rgba(240, 180, 41, 0.22);
+  color: #e8c877;
+}
+
+.mm-warn code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  font-size: 10.5px;
+}
+
+.mm-tile.drop-target {
+  outline: 2px dashed #f0b429;
+  outline-offset: 2px;
+}

@@ -96,3 +96,39 @@
   max-width: 34ch;
   line-height: 1.5;
 }
+
+/* এরর স্টেটের অ্যাকশন বাটন (রিট্রাই / নতুন ট্যাবে খুলুন) */
+.vp-error-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.vp-error-actions button,
+.vp-error-actions a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 13px;
+  font-size: 12.5px;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.18s ease;
+}
+
+.vp-error-actions button:hover,
+.vp-error-actions a:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.vp-error small {
+  max-width: 420px;
+  line-height: 1.6;
+}

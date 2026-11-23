@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FiCheck,
   FiRotateCcw,
@@ -16,10 +16,19 @@ import {
 
 /** Local draft of a config slice with dirty tracking. */
 export const useDraft = (source) => {
-  const [draft, setDraft] = useState(source);
+  const [draft, setDraft] = useState(source ?? {});
   const [dirty, setDirty] = useState(false);
   const sourceRef = useRef(source);
   sourceRef.current = source;
+
+  /* ⚠️ আগের বাগ: রিমোট কনফিগ (Supabase) মাউন্টের পরে লোড হলে
+     `draft` কখনো আপডেট হত না — অ্যাডমিনে পুরনো/খালি মান দেখাত,
+     আর সেভ করলে সেটাই রিমোটে চলে যেত (ডেটা হারানোর ঝুঁকি)।
+     এখন: ইউজার কিছু না বদলে থাকলে সোর্স বদলালে ড্রাফটও বদলায়। */
+  useEffect(() => {
+    if (dirty) return;
+    setDraft(source ?? {});
+  }, [source, dirty]);
 
   const update = useCallback((patch) => {
     setDraft((d) => (typeof patch === 'function' ? patch(d) : { ...d, ...patch }));

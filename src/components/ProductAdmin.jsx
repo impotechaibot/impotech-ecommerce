@@ -11,78 +11,78 @@ import {
   FiRotateCcw,
   FiChevronDown,
   FiPackage,
+  FiVideo,
+  FiCloud,
+  FiHardDrive,
 } from 'react-icons/fi';
-import { categories } from '../productsStore/Store.js';
-import { useProducts, readProducts, hasCustomProducts } from '../hooks/useProducts.js';
-import {
-  formatMoney,
-  productImage,
-  productImages,
-  productVideos,
-  PLACEHOLDER_IMAGE,
-} from '../utils/format.js';
+import { useCategories } from '../hooks/useCategories.js';
+import { useProducts } from '../hooks/useProducts.js';
+import { formatMoney, productImage, PLACEHOLDER_IMAGE } from '../utils/format.js';
+import { emptyProduct, toDraft, toProduct } from '../lib/normalize.js';
+import { removeMedia } from '../lib/db.js';
 import MediaManager from './MediaManager.jsx';
 import '../styles/ProductAdmin.css';
 
-const EMPTY_FORM = {
-  id: '',
-  name: '',
-  bn: '',
-  category: categories[0]?.id || 'angel-wings',
-  price: '',
-  oldPrice: '',
-  stock: '',
-  desc: '',
-  images: [],
-  videos: [],
-  tag: '',
-  badge: '',
-  rating: '5',
-  reviews: '0',
-  featured: false,
-  videoAutoplay: false,
-};
+/* ==========================================================
+   ProductAdmin — প্রোডাক্ট ম্যানেজার (v2)
 
-// Turns a free-text name into a URL-safe id (kept stable once created).
-const slugify = (text) =>
-  String(text || '')
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\u0980-\u09FF]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 48) || 'product';
+   ⚠️ আগের বাগ:
+     • সেভ শুধু localStorage-এ যেত → লাইভ সাইটে কিছুই আসত না
+     • ভিডিও base64 হয়ে স্টোরেজ ভরে দিত → সেভ চুপচাপ ব্যর্থ
+     • এরর মেসেজ জেনেরিক ছিল, আসল কারণ জানা যেত না
+
+   এখন:
+     • সেভ/ডিলিট সরাসরি Supabase-এ (db.js দিয়ে)
+     • আসল এরর বাংলায় দেখায় (RLS, bucket, নেটওয়ার্ক …)
+     • ভিডিও Storage-এ, প্রোডাক্টে শুধু URL
+     • ডেটা সোর্স ব্যাজ: Supabase (লাইভ) / লোকাল (ডেমো)
+   ========================================================== */
 
 const ProductAdmin = () => {
-  const { products, save, reset } = useProducts();
+  const {
+    products,
+    loading,
+    status,
+    isRemote,
+    add,
+    update,
+    remove,
+    replaceAll,
+    reload,
+  } = useProducts();
+  const { categories } = useCategories();
 
   const [query, setQuery] = useState('');
   const [catFilter, setCatFilter] = useState('all');
   const [editing, setEditing] = useState(null); // product id | 'new' | null
-  const [draft, setDraft] = useState(EMPTY_FORM);
+  const [draft, setDraft] = useState(emptyProduct());
   const [errors, setErrors] = useState({});
-  const [notice, setNotice] = useState(null); // {type, text}
-  const [confirmDelete, setConfirmDelete] = useState(null); // product
+  const [notice, setNotice] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null);
   const [confirmReset, setConfirmReset] = useState(false);
 
   const flash = (type, text) => {
     setNotice({ type, text });
-    setTimeout(() => setNotice(null), 2800);
+    setTimeout(() => setNotice(null), 5000);
   };
 
   const catName = (id) =>
-    categories.find((c) => c.id === id)?.name || 'অন্যান্য';
+    categories.find((c) => c.id === id)?.name_bn ||
+    categories.find((c) => c.id === id)?.name ||
+    'অন্যান্য';
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return products.filter((p) => {
-      const matchCat = catFilter === 'all' || p.category === catFilter;
+      const matchCat = catFilter === 'all' || p.category_id === catFilter;
       if (!matchCat) return false;
       if (!q) return true;
       return (
-        p.name.toLowerCase().includes(q) ||
-        (p.bn || '').toLowerCase().includes(q) ||
-        p.category.includes(q) ||
-        (p.tag || '').toLowerCase().includes(q)
+        String(p.name || '').toLowerCase().includes(q) ||
+        String(p.name_bn || '').toLowerCase().includes(q) ||
+        String(p.category_id || '').includes(q) ||
+        String(p.tag || '').toLowerCase().includes(q)
       );
     });
   }, [products, query, catFilter]);
@@ -91,61 +91,40 @@ const ProductAdmin = () => {
     () => ({
       total: products.length,
       out: products.filter((p) => Number(p.stock) <= 0).length,
-      low: products.filter((p) => Number(p.stock) > 0 && Number(p.stock) <= 10)
-        .length,
-      value: products.reduce(
-        (sum, p) => sum + Number(p.price) * Number(p.stock || 0),
-        0
-      ),
+      low: products.filter((p) => Number(p.stock) > 0 && Number(p.stock) <= 10).length,
+      withVideo: products.filter((p) => (p.videos || []).length > 0).length,
+      value: products.reduce((sum, p) => sum + Number(p.price) * Number(p.stock || 0), 0),
     }),
     [products]
   );
 
-  /* ---------------- form handling ---------------- */
+  /* ---------------- ফর্ম ---------------- */
 
   const openNew = () => {
-    setDraft({ ...EMPTY_FORM });
+    setDraft(emptyProduct(categories[0]?.id || ''));
     setErrors({});
     setEditing('new');
   };
 
   const openEdit = (p) => {
-    setDraft({
-      id: p.id,
-      name: p.name || '',
-      bn: p.bn || '',
-      category: p.category || categories[0]?.id,
-      price: String(p.price ?? ''),
-      oldPrice: String(p.oldPrice ?? ''),
-      stock: String(p.stock ?? ''),
-      desc: p.desc || '',
-      images: productImages(p),
-      videos: productVideos(p),
-      tag: p.tag || '',
-      badge: p.badge || '',
-      rating: String(p.rating ?? 5),
-      reviews: String(p.reviews ?? 0),
-      featured: p.badge === 'bestSeller' || Boolean(p.featured),
-      videoAutoplay: Boolean(p.videoAutoplay),
-    });
+    setDraft(toDraft(p));
     setErrors({});
     setEditing(p.id);
   };
 
   const closeForm = () => {
     setEditing(null);
-    setDraft(EMPTY_FORM);
+    setDraft(emptyProduct());
     setErrors({});
   };
 
   const validate = () => {
     const next = {};
-    // Trim first: " " or "abc" must never slip through as a valid number.
     const priceText = String(draft.price ?? '').trim();
-    const oldText = String(draft.oldPrice ?? '').trim();
+    const oldText = String(draft.old_price ?? '').trim();
     const stockText = String(draft.stock ?? '').trim();
 
-    if (!draft.name.trim() && !draft.bn.trim())
+    if (!String(draft.name_bn || '').trim() && !String(draft.name || '').trim())
       next.name = 'নাম আবশ্যক (বাংলা বা ইংরেজি যেকোনো একটি)';
 
     if (!priceText && priceText !== '0') next.price = 'দাম আবশ্যক';
@@ -153,9 +132,9 @@ const ProductAdmin = () => {
       next.price = 'দাম একটি ধনাত্মক সংখ্যা হতে হবে';
 
     if (oldText && !Number.isFinite(Number(oldText)))
-      next.oldPrice = 'আগের দাম সংখ্যা হতে হবে';
+      next.old_price = 'আগের দাম সংখ্যা হতে হবে';
     else if (oldText && Number(oldText) > 0 && Number(oldText) < Number(priceText))
-      next.oldPrice = 'আগের দাম বর্তমান দামের কম হতে পারে না';
+      next.old_price = 'আগের দাম বর্তমান দামের কম হতে পারে না';
 
     if (stockText && (!Number.isFinite(Number(stockText)) || Number(stockText) < 0))
       next.stock = 'স্টক ০ বা তার বেশি হতে হবে';
@@ -164,101 +143,73 @@ const ProductAdmin = () => {
     return Object.keys(next).length === 0;
   };
 
-  const commitForm = (e) => {
+  const commitForm = async (e) => {
     e.preventDefault();
     if (!validate()) return;
 
+    setSaving(true);
     const isNew = editing === 'new';
-    const base = isNew ? readProducts() : products;
-    let id = draft.id;
-
-    if (isNew) {
-      const seed = slugify(draft.name || draft.bn);
-      id = seed;
-      let n = 2;
-      while (base.some((p) => p.id === id)) id = `${seed}-${n++}`;
-    }
-
-    const price = Number(draft.price);
-    const oldPrice = draft.oldPrice === '' ? price : Math.max(price, Number(draft.oldPrice));
-
-    const record = {
-      id,
-      name: draft.name.trim() || draft.bn.trim(),
-      bn: draft.bn.trim() || draft.name.trim(),
-      price,
-      oldPrice,
-      category: draft.category,
-      tag: draft.tag.trim(),
-      badge: draft.featured ? 'bestSeller' : draft.badge.trim(),
-      featured: draft.featured,
-      rating: Math.max(1, Math.min(5, Number(draft.rating) || 5)),
-      reviews: Number(draft.reviews) || 0,
+    const payload = {
+      ...draft,
+      price: Number(draft.price) || 0,
+      old_price: draft.old_price === '' ? Number(draft.price) || 0 : Number(draft.old_price),
       stock: Number(draft.stock) || 0,
-      desc: draft.desc.trim(),
-      colors: isNew ? ['ডিফল্ট'] : undefined,
-      features: isNew ? [] : undefined,
-      // First image is the primary one shown on cards / listings.
-      images: draft.images.length
-        ? draft.images
-        : isNew
-        ? [PLACEHOLDER_IMAGE]
-        : [],
-      videos: draft.videos,
-      videoAutoplay: Boolean(draft.videoAutoplay),
+      rating: Math.max(1, Math.min(5, Number(draft.rating) || 5)),
+      reviews_count: Number(draft.reviews_count) || 0,
+      images: draft.images.length ? draft.images : isNew ? [PLACEHOLDER_IMAGE] : [],
     };
 
-    // Keep any fields we do not edit here (colors / features) from the original.
-    const existing = base.find((p) => p.id === id);
-    const merged = existing
-      ? {
-          ...existing,
-          ...record,
-          colors: existing.colors,
-          features: existing.features,
-          images: record.images,
-          videos: record.videos,
-        }
-      : {
-          ...record,
-          colors: ['ডিফল্ট'],
-          features: [],
-        };
+    const res = isNew ? await add(payload) : await update(editing, payload);
+    setSaving(false);
 
-    const nextList = isNew
-      ? [merged, ...base]
-      : base.map((p) => (p.id === id ? merged : p));
-
-    const ok = save(nextList);
-    if (!ok) {
-      flash('error', 'সেভ করা যায়নি — ব্রাউজার স্টোরেজ পূর্ণ হয়ে থাকতে পারে। ছোট ছবি ব্যবহার করুন।');
+    if (!res.ok) {
+      flash('error', `সেভ হয়নি — ${res.error}`);
       return;
     }
-    flash('ok', isNew ? 'নতুন প্রোডাক্ট যোগ হয়েছে' : 'প্রোডাক্ট আপডেট হয়েছে');
+    flash(
+      'ok',
+      isNew
+        ? 'নতুন প্রোডাক্ট যোগ হয়েছে — লাইভ সাইটে দেখা যাবে'
+        : 'প্রোডাক্ট আপডেট হয়েছে'
+    );
     closeForm();
   };
 
-  const doDelete = () => {
+  const doDelete = async () => {
     if (!confirmDelete) return;
-    const next = products.filter((p) => p.id !== confirmDelete.id);
-    const ok = save(next);
+    const target = confirmDelete;
     setConfirmDelete(null);
-    if (!ok) {
-      flash('error', 'ডিলিট সেভ করা যায়নি');
+    setSaving(true);
+
+    // Storage-এ থাকা ভিডিও/ছবি পরিষ্কার (বাইরের লিঙ্ক ছোঁবে না)
+    const media = [...(target.videos || []), ...(target.images || [])];
+    for (const url of media) {
+      if (String(url).includes('/object/public/')) await removeMedia(url);
+    }
+
+    const res = await remove(target.id);
+    setSaving(false);
+    if (!res.ok) {
+      flash('error', `ডিলিট হয়নি — ${res.error}`);
       return;
     }
-    if (editing === confirmDelete.id) closeForm();
+    if (editing === target.id) closeForm();
     flash('ok', 'প্রোডাক্ট ডিলিট হয়েছে');
   };
 
-  const doReset = () => {
-    reset();
+  const doReset = async () => {
     setConfirmReset(false);
+    setSaving(true);
+    const res = await replaceAll([]);
+    setSaving(false);
     closeForm();
-    flash('ok', 'ডিফল্ট প্রোডাক্ট তালিকা ফিরিয়ে আনা হয়েছে');
+    if (!res.ok) {
+      flash('error', `রিসেট হয়নি — ${res.error}`);
+      return;
+    }
+    flash('ok', 'সব প্রোডাক্ট সরানো হয়েছে');
   };
 
-  // Esc closes whichever overlay is open.
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== 'Escape') return;
@@ -279,7 +230,28 @@ const ProductAdmin = () => {
         </div>
       )}
 
-      {/* stats */}
+      {/* ডেটা সোর্স */}
+      <div className={`pa-source ${isRemote ? 'live' : 'demo'}`}>
+        {isRemote ? <FiCloud size={14} /> : <FiHardDrive size={14} />}
+        <b>{isRemote ? 'Supabase (লাইভ)' : 'লোকাল (ডেমো)'}</b>
+        <span>
+          {isRemote
+            ? 'সেভ করলে সব ডিভাইসে সাথে সাথে দেখা যাবে'
+            : 'Supabase কনফিগার নেই — পরিবর্তন শুধু এই ব্রাউজারে থাকবে'}
+        </span>
+        <button type="button" onClick={reload} disabled={loading}>
+          <FiRotateCcw size={13} /> রিফ্রেশ
+        </button>
+      </div>
+
+      {status.error && (
+        <div className="pa-notice error" role="alert">
+          <FiAlertTriangle size={15} />
+          ডেটা লোডে সমস্যা: {status.error}
+        </div>
+      )}
+
+      {/* পরিসংখ্যান */}
       <div className="pa-stats">
         <div>
           <span>মোট প্রোডাক্ট</span>
@@ -294,12 +266,16 @@ const ProductAdmin = () => {
           <b>{stats.low}</b>
         </div>
         <div>
+          <span>ভিডিওসহ</span>
+          <b>{stats.withVideo}</b>
+        </div>
+        <div>
           <span>স্টক ভ্যালু</span>
           <b>{formatMoney(stats.value)}</b>
         </div>
       </div>
 
-      {/* toolbar */}
+      {/* টুলবার */}
       <div className="pa-toolbar">
         <div className="pa-search">
           <FiSearch size={15} />
@@ -326,7 +302,7 @@ const ProductAdmin = () => {
             <option value="all">সব ক্যাটাগরি</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.name}
+                {c.name_bn || c.name}
               </option>
             ))}
           </select>
@@ -338,9 +314,14 @@ const ProductAdmin = () => {
         </button>
       </div>
 
-      {/* table */}
+      {/* টেবিল */}
       <div className="pa-table-wrap">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="pa-empty">
+            <FiPackage size={34} />
+            <p>লোড হচ্ছে…</p>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="pa-empty">
             <FiPackage size={34} />
             <p>কোনো প্রোডাক্ট পাওয়া যায়নি।</p>
@@ -363,6 +344,7 @@ const ProductAdmin = () => {
                 <th>ক্যাটাগরি</th>
                 <th>দাম</th>
                 <th>স্টক</th>
+                <th>মিডিয়া</th>
                 <th>স্ট্যাটাস</th>
                 <th aria-label="অ্যাকশন" />
               </tr>
@@ -374,24 +356,35 @@ const ProductAdmin = () => {
                     <div className="pa-prod">
                       <img src={productImage(p, 0)} alt="" loading="lazy" />
                       <div>
-                        <b>{p.bn || p.name}</b>
-                        <small>{p.id}</small>
+                        <b>{p.name_bn || p.name}</b>
+                        <small>{p.slug}</small>
                       </div>
                     </div>
                   </td>
                   <td data-label="ক্যাটাগরি">
-                    <span className="pa-cat">{catName(p.category)}</span>
+                    <span className="pa-cat">{catName(p.category_id)}</span>
                   </td>
                   <td data-label="দাম">
                     <div className="pa-price">
                       <b>{formatMoney(p.price)}</b>
-                      {p.oldPrice > p.price && <s>{formatMoney(p.oldPrice)}</s>}
+                      {p.old_price > p.price && <s>{formatMoney(p.old_price)}</s>}
                     </div>
                   </td>
                   <td data-label="স্টক">
                     <span className={Number(p.stock) <= 0 ? 'pa-stock out' : 'pa-stock'}>
                       {Number(p.stock) || 0}
                     </span>
+                  </td>
+                  <td data-label="মিডিয়া">
+                    <div className="pa-media">
+                      <span title="ছবি">{p.images.length} 🖼</span>
+                      <span
+                        className={(p.videos || []).length ? 'has-video' : ''}
+                        title="ভিডিও"
+                      >
+                        <FiVideo size={12} /> {p.videos.length}
+                      </span>
+                    </div>
                   </td>
                   <td data-label="স্ট্যাটাস">
                     {Number(p.stock) <= 0 ? (
@@ -432,26 +425,26 @@ const ProductAdmin = () => {
 
       <div className="pa-foot">
         <p className="ad-hint">
-          {filtered.length}টি দেখানো হচ্ছে · মোট {products.length}টি। পরিবর্তন
-          <code>localStorage['impotech_products']</code>-এ সেভ হয় এবং সব পেজে সাথে সাথে প্রয়োগ হয়।
+          {filtered.length}টি দেখানো হচ্ছে · মোট {products.length}টি।
+          {isRemote
+            ? ' পরিবর্তন Supabase-এ সেভ হয় এবং সব ডিভাইসে দেখা যায়।'
+            : ' ডেমো মোডে পরিবর্তন শুধু এই ব্রাউজারে থাকে।'}
         </p>
         <button
           type="button"
           className="btn-ghost pa-reset"
           onClick={() => setConfirmReset(true)}
-          disabled={!hasCustomProducts()}
+          disabled={!products.length || saving}
         >
-          <FiRotateCcw size={14} /> ডিফল্টে ফিরিয়ে নিন
+          <FiRotateCcw size={14} /> সব প্রোডাক্ট সরান
         </button>
       </div>
 
-      {/* ---------------- editor drawer ---------------- */}
+      {/* ---------------- এডিটর ---------------- */}
       {editing && (
         <>
           <div className="pa-scrim" onClick={closeForm} aria-hidden="true" />
           <aside className="pa-drawer" aria-label="প্রোডাক্ট এডিটর">
-            {/* noValidate: the form runs its own validation so every message
-                comes out in Bengali inside the field instead of a browser popup. */}
             <form onSubmit={commitForm} noValidate>
               <div className="pa-drawer-head">
                 <h3>
@@ -467,8 +460,8 @@ const ProductAdmin = () => {
                 <label className="pa-field">
                   <span>নাম (বাংলা) *</span>
                   <input
-                    value={draft.bn}
-                    onChange={(e) => setDraft({ ...draft, bn: e.target.value })}
+                    value={draft.name_bn}
+                    onChange={(e) => setDraft({ ...draft, name_bn: e.target.value })}
                     placeholder="যেমন: LED অ্যাঞ্জেল উইংস — সাদা"
                   />
                   {errors.name && <em>{errors.name}</em>}
@@ -487,12 +480,12 @@ const ProductAdmin = () => {
                   <span>ক্যাটাগরি</span>
                   <div className="pa-select">
                     <select
-                      value={draft.category}
-                      onChange={(e) => setDraft({ ...draft, category: e.target.value })}
+                      value={draft.category_id}
+                      onChange={(e) => setDraft({ ...draft, category_id: e.target.value })}
                     >
                       {categories.map((c) => (
                         <option key={c.id} value={c.id}>
-                          {c.name}
+                          {c.name_bn || c.name}
                         </option>
                       ))}
                     </select>
@@ -518,11 +511,11 @@ const ProductAdmin = () => {
                     <input
                       type="text"
                       inputMode="decimal"
-                      value={draft.oldPrice}
-                      onChange={(e) => setDraft({ ...draft, oldPrice: e.target.value })}
+                      value={draft.old_price}
+                      onChange={(e) => setDraft({ ...draft, old_price: e.target.value })}
                       placeholder="850"
                     />
-                    {errors.oldPrice && <em>{errors.oldPrice}</em>}
+                    {errors.old_price && <em>{errors.old_price}</em>}
                   </label>
                 </div>
 
@@ -553,8 +546,8 @@ const ProductAdmin = () => {
                   <span>বিবরণ</span>
                   <textarea
                     rows={4}
-                    value={draft.desc}
-                    onChange={(e) => setDraft({ ...draft, desc: e.target.value })}
+                    value={draft.description}
+                    onChange={(e) => setDraft({ ...draft, description: e.target.value })}
                     placeholder="সংক্ষিপ্ত বিবরণ…"
                   />
                 </label>
@@ -587,8 +580,8 @@ const ProductAdmin = () => {
                     <input
                       type="text"
                       inputMode="numeric"
-                      value={draft.reviews}
-                      onChange={(e) => setDraft({ ...draft, reviews: e.target.value })}
+                      value={draft.reviews_count}
+                      onChange={(e) => setDraft({ ...draft, reviews_count: e.target.value })}
                     />
                   </label>
                 </div>
@@ -609,23 +602,38 @@ const ProductAdmin = () => {
                 <label className="pa-toggle">
                   <input
                     type="checkbox"
-                    checked={draft.videoAutoplay}
-                    onChange={(e) =>
-                      setDraft({ ...draft, videoAutoplay: e.target.checked })
-                    }
+                    checked={draft.video_autoplay}
+                    onChange={(e) => setDraft({ ...draft, video_autoplay: e.target.checked })}
                   />
                   <span className="pa-switch" aria-hidden="true" />
                   <span>
                     <b>ভিডিও অটো-প্লে (muted)</b>
-                    <small>প্রোডাক্ট পেজে ভিডিও স্বয়ংক্রিয়ভাবে চুপচাপ চলবে, ইউজার চাইলে সাউন্ড চালু করবে</small>
+                    <small>প্রোডাক্ট পেজে ভিডিও স্বয়ংক্রিয়ভাবে চুপচাপ চলবে</small>
+                  </span>
+                </label>
+
+                <label className="pa-toggle">
+                  <input
+                    type="checkbox"
+                    checked={draft.free_delivery}
+                    onChange={(e) => setDraft({ ...draft, free_delivery: e.target.checked })}
+                  />
+                  <span className="pa-switch" aria-hidden="true" />
+                  <span>
+                    <b>ফ্রি ডেলিভারি</b>
+                    <small>এই প্রোডাক্টে ডেলিভারি চার্জ লাগবে না</small>
                   </span>
                 </label>
               </div>
 
               <div className="pa-drawer-foot">
-                <button type="submit" className="btn-primary">
+                <button type="submit" className="btn-primary" disabled={saving}>
                   <FiSave size={15} />
-                  {editing === 'new' ? 'প্রোডাক্ট যোগ করুন' : 'আপডেট সেভ করুন'}
+                  {saving
+                    ? 'সেভ হচ্ছে…'
+                    : editing === 'new'
+                    ? 'প্রোডাক্ট যোগ করুন'
+                    : 'আপডেট সেভ করুন'}
                 </button>
                 <button type="button" className="btn-ghost" onClick={closeForm}>
                   বাতিল
@@ -636,7 +644,7 @@ const ProductAdmin = () => {
         </>
       )}
 
-      {/* ---------------- delete confirm ---------------- */}
+      {/* ---------------- ডিলিট কনফার্ম ---------------- */}
       {confirmDelete && (
         <div className="pa-modal-wrap" role="dialog" aria-modal="true">
           <div className="pa-modal-scrim" onClick={() => setConfirmDelete(null)} />
@@ -646,18 +654,14 @@ const ProductAdmin = () => {
             </div>
             <h3>প্রোডাক্ট ডিলিট করবেন?</h3>
             <p>
-              <b>{confirmDelete.bn || confirmDelete.name}</b> স্থায়ীভাবে তালিকা থেকে সরে যাবে।
-              চাইলে পরে আবার যোগ করতে পারবেন।
+              <b>{confirmDelete.name_bn || confirmDelete.name}</b> স্থায়ীভাবে তালিকা
+              থেকে সরে যাবে। এর সাথে যুক্ত আপলোড করা ভিডিও/ছবিও Storage থেকে মুছে যাবে।
             </p>
             <div className="pa-modal-actions">
               <button type="button" className="btn-danger" onClick={doDelete}>
                 <FiTrash2 size={15} /> হ্যাঁ, ডিলিট করুন
               </button>
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={() => setConfirmDelete(null)}
-              >
+              <button type="button" className="btn-ghost" onClick={() => setConfirmDelete(null)}>
                 বাতিল
               </button>
             </div>
@@ -665,7 +669,7 @@ const ProductAdmin = () => {
         </div>
       )}
 
-      {/* ---------------- reset confirm ---------------- */}
+      {/* ---------------- রিসেট কনফার্ম ---------------- */}
       {confirmReset && (
         <div className="pa-modal-wrap" role="dialog" aria-modal="true">
           <div className="pa-modal-scrim" onClick={() => setConfirmReset(false)} />
@@ -673,20 +677,16 @@ const ProductAdmin = () => {
             <div className="pa-modal-ico">
               <FiRotateCcw size={22} />
             </div>
-            <h3>ডিফল্ট প্রোডাক্টে ফিরে যাবেন?</h3>
+            <h3>সব প্রোডাক্ট সরাবেন?</h3>
             <p>
-              অ্যাডমিন থেকে করা সব প্রোডাক্ট পরিবর্তন মুছে যাবে এবং
-              <code>Store.js</code>-এর মূল তালিকা ফিরে আসবে।
+              তালিকার সব প্রোডাক্ট মুছে যাবে{isRemote ? ' (Supabase থেকেও)' : ''}। এই কাজ
+              ফেরানো যাবে না — আগে ব্যাকআপ নিয়ে রাখুন।
             </p>
             <div className="pa-modal-actions">
               <button type="button" className="btn-danger" onClick={doReset}>
-                <FiRotateCcw size={15} /> হ্যাঁ, রিসেট করুন
+                <FiRotateCcw size={15} /> হ্যাঁ, সব সরান
               </button>
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={() => setConfirmReset(false)}
-              >
+              <button type="button" className="btn-ghost" onClick={() => setConfirmReset(false)}>
                 বাতিল
               </button>
             </div>

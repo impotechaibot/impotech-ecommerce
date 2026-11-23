@@ -8,28 +8,37 @@ import {
   FiAlertTriangle,
   FiStar,
   FiMove,
+  FiCheck,
+  FiPlay,
 } from 'react-icons/fi';
-import {
-  formatBytes,
-  dataUrlBytes,
-  listBytes,
-  STORAGE_BUDGET_BYTES,
-  VIDEO_WARN_BYTES,
-} from '../utils/format.js';
+import { formatBytes, dataUrlBytes, listBytes } from '../utils/format.js';
+import { uploadMedia, canUploadMedia, isRemote } from '../lib/db.js';
+import { getYouTubeId, getYouTubeThumbnail, isYouTubeVideo } from '../components/VideoPlayer.jsx';
 
 /* ==========================================================
-   MediaManager
-   Multi-image + multi-video editor used inside the product form.
-   - images: drag & drop / multi-select upload, thumbnail grid,
-     drag-to-reorder, delete, first item = primary image
-   - videos: mp4/webm upload or URL, preview player, delete,
-     size warning so localStorage never overflows
+   MediaManager — ছবি + ভিডিও ম্যানেজার (v2)
+
+   ⚠️ আগের বাগ: ভিডিও ফাইল base64 `data:` URL হয়ে প্রোডাক্টে
+   ঢুকত → localStorage (~5MB) ভরে যেত → সেভ চুপচাপ ব্যর্থ হত →
+   ভিডিও কোথাও থাকত না, সাইটে কালো বক্স।
+
+   এখন:
+     • ভিডিও Supabase Storage-এ আপলোড হয়, প্রোডাক্টে শুধু URL থাকে
+     • আপলোড প্রোগ্রেস (%) দেখায়
+     • YouTube লিঙ্ক দিলে সাথে সাথে থাম্বনেইল প্রিভিউ
+     • ছবি আগের মতোই ছোট করে data URL-এ (কারণ ছবি ছোট)
+     • Storage না থাকলে স্পষ্ট বার্তা — চুপচাপ হারায় না
    ========================================================== */
 
 const MAX_IMAGE_EDGE = 1000;
 const IMAGE_QUALITY = 0.78;
 
-/** Downscale an image file to a JPEG data URL (keeps localStorage small). */
+export const MAX_VIDEO_MB = 50;
+export const MAX_IMAGE_MB = 8;
+
+const VIDEO_EXT = /\.(mp4|webm|ogv|ogg|mov|m4v)$/i;
+
+/** ছবি ছোট করে JPEG data URL — localStorage-এ ছবি রাখা নিরাপদ। */
 export const resizeImageToDataUrl = (file, max = MAX_IMAGE_EDGE, quality = IMAGE_QUALITY) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -50,20 +59,12 @@ export const resizeImageToDataUrl = (file, max = MAX_IMAGE_EDGE, quality = IMAGE
     reader.readAsDataURL(file);
   });
 
-/** Read a video file as a data URL (no transcoding — browsers cannot). */
-const readVideoToDataUrl = (file) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('read failed'));
-    reader.onload = () => resolve(reader.result);
-    reader.readAsDataURL(file);
-  });
-
 const MediaManager = ({ images = [], videos = [], onChange, onError }) => {
   const [imgUrl, setImgUrl] = useState('');
   const [vidUrl, setVidUrl] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [dragIndex, setDragIndex] = useState(null);
   const [overIndex, setOverIndex] = useState(null);
   const imgInput = useRef(null);
@@ -71,17 +72,14 @@ const MediaManager = ({ images = [], videos = [], onChange, onError }) => {
 
   const imageBytes = listBytes(images);
   const videoBytes = listBytes(videos);
-  const totalBytes = imageBytes + videoBytes;
-  const overBudget = totalBytes > STORAGE_BUDGET_BYTES;
+  const storageReady = canUploadMedia();
 
   const emit = (next) => onChange({ images, videos, ...next });
 
-  /* ---------------- images ---------------- */
+  /* ---------------- ছবি ---------------- */
 
   const addImageFiles = async (fileList) => {
-    const files = Array.from(fileList || []).filter((f) =>
-      f.type.startsWith('image/')
-    );
+    const files = Array.from(fileList || []).filter((f) => f.type.startsWith('image/'));
     if (!files.length) {
       onError?.('শুধু ছবি ফাইল আপলোড করুন (JPG / PNG / WEBP)');
       return;
@@ -89,6 +87,10 @@ const MediaManager = ({ images = [], videos = [], onChange, onError }) => {
     setBusy(true);
     const added = [];
     for (const file of files) {
+      if (file.size > MAX_IMAGE_MB * 1024 * 1024) {
+        onError?.(`"${file.name}" অনেক বড় — সর্বোচ্চ ${MAX_IMAGE_MB}MB`);
+        continue;
+      }
       try {
         added.push(await resizeImageToDataUrl(file));
       } catch {
@@ -110,8 +112,7 @@ const MediaManager = ({ images = [], videos = [], onChange, onError }) => {
     setImgUrl('');
   };
 
-  const removeImage = (i) =>
-    emit({ images: images.filter((_, idx) => idx !== i) });
+  const removeImage = (i) => emit({ images: images.filter((_, idx) => idx !== i) });
 
   const makePrimary = (i) => {
     if (i === 0) return;
@@ -129,26 +130,48 @@ const MediaManager = ({ images = [], videos = [], onChange, onError }) => {
     emit({ images: next });
   };
 
-  /* ---------------- videos ---------------- */
+  /* ---------------- ভিডিও ---------------- */
 
   const addVideoFiles = async (fileList) => {
     const files = Array.from(fileList || []).filter(
-      (f) => f.type.startsWith('video/') || /\.(mp4|webm|ogv|mov|m4v)$/i.test(f.name)
+      (f) => f.type.startsWith('video/') || VIDEO_EXT.test(f.name)
     );
     if (!files.length) {
       onError?.('শুধু ভিডিও ফাইল আপলোড করুন (mp4 / webm)');
       return;
     }
+
+    if (!storageReady) {
+      onError?.(
+        'ভিডিও আপলোডের জন্য Supabase Storage দরকার। ' +
+          'Vercel-এ VITE_SUPABASE_URL ও VITE_SUPABASE_ANON_KEY দিন, ' +
+          'অথবা নিচে হোস্ট করা ভিডিওর লিঙ্ক পেস্ট করুন।'
+      );
+      return;
+    }
+
     setBusy(true);
     const added = [];
     for (const file of files) {
-      try {
-        const data = await readVideoToDataUrl(file);
-        added.push(data);
-      } catch {
-        onError?.(`"${file.name}" পড়া যায়নি`);
+      if (file.size > MAX_VIDEO_MB * 1024 * 1024) {
+        onError?.(
+          `"${file.name}" অনেক বড় (${formatBytes(file.size)}) — সর্বোচ্চ ${MAX_VIDEO_MB}MB`
+        );
+        continue;
+      }
+      setProgress(0);
+      const res = await uploadMedia(file, {
+        kind: 'video',
+        folder: 'products',
+        onProgress: setProgress,
+      });
+      if (res.ok) {
+        added.push(res.data.url);
+      } else {
+        onError?.(`"${file.name}" আপলোড হয়নি — ${res.error}`);
       }
     }
+    setProgress(0);
     setBusy(false);
     if (added.length) emit({ videos: [...videos, ...added] });
   };
@@ -160,16 +183,19 @@ const MediaManager = ({ images = [], videos = [], onChange, onError }) => {
       onError?.('ভিডিওর URL http(s):// বা data:video/ দিয়ে শুরু হতে হবে');
       return;
     }
+    if (videos.includes(url)) {
+      onError?.('এই ভিডিওটি আগেই যোগ করা আছে');
+      return;
+    }
     emit({ videos: [...videos, url] });
     setVidUrl('');
   };
 
-  const removeVideo = (i) =>
-    emit({ videos: videos.filter((_, idx) => idx !== i) });
+  const removeVideo = (i) => emit({ videos: videos.filter((_, idx) => idx !== i) });
 
   return (
     <div className="mm-wrap">
-      {/* ---------------- images ---------------- */}
+      {/* ---------------- ছবি ---------------- */}
       <section className="mm-block">
         <header className="mm-head">
           <h4>
@@ -302,14 +328,16 @@ const MediaManager = ({ images = [], videos = [], onChange, onError }) => {
         )}
       </section>
 
-      {/* ---------------- videos ---------------- */}
+      {/* ---------------- ভিডিও ---------------- */}
       <section className="mm-block">
         <header className="mm-head">
           <h4>
             <FiVideo size={15} /> ভিডিও
             <span className="mm-count">{videos.length}</span>
           </h4>
-          <span className="mm-size">{formatBytes(videoBytes)}</span>
+          <span className="mm-size">
+            {storageReady ? 'Supabase Storage' : 'শুধু লিঙ্ক'}
+          </span>
         </header>
 
         <div
@@ -322,8 +350,15 @@ const MediaManager = ({ images = [], videos = [], onChange, onError }) => {
           }}
         >
           <FiUploadCloud size={20} />
-          <span>ভিডিও আপলোড করুন (mp4 / webm)</span>
-          <small>একসাথে একাধিক ভিডিও · বড় ফাইল সেভ নাও হতে পারে</small>
+          <span>
+            {busy && progress > 0
+              ? `আপলোড হচ্ছে… ${progress}%`
+              : 'ভিডিও আপলোড করুন (mp4 / webm)'}
+          </span>
+          <small>
+            সর্বোচ্চ {MAX_VIDEO_MB}MB · একসাথে একাধিক ভিডিও
+            {!storageReady && ' · Storage কনফিগার নেই'}
+          </small>
           <input
             ref={vidInput}
             type="file"
@@ -336,18 +371,41 @@ const MediaManager = ({ images = [], videos = [], onChange, onError }) => {
           />
         </div>
 
+        {busy && progress > 0 && (
+          <div className="mm-progress" role="progressbar" aria-valuenow={progress}>
+            <span style={{ width: `${progress}%` }} />
+          </div>
+        )}
+
         {videos.length > 0 && (
           <ul className="mm-vid-list">
             {videos.map((src, i) => {
+              const yt = isYouTubeVideo(src);
               const bytes = dataUrlBytes(src);
-              const heavy = bytes > VIDEO_WARN_BYTES;
+              const heavy = bytes > 800 * 1024;
               return (
-                <li key={src.slice(0, 40) + i} className="mm-vid">
-                  <video src={src} controls preload="metadata" playsInline />
+                <li key={src.slice(0, 60) + i} className="mm-vid">
+                  {yt ? (
+                    <div className="mm-vid-yt">
+                      <img src={getYouTubeThumbnail(src)} alt={`YouTube ${i + 1}`} />
+                      <span className="mm-vid-play">
+                        <FiPlay size={14} />
+                      </span>
+                    </div>
+                  ) : (
+                    <video src={src} controls preload="metadata" playsInline />
+                  )}
                   <div className="mm-vid-meta">
-                    <b>ভিডিও {i + 1}</b>
+                    <b>
+                      ভিডিও {i + 1}
+                      {yt && <span className="mm-yt-tag">YouTube</span>}
+                    </b>
                     <small className={heavy ? 'warn' : ''}>
-                      {bytes ? formatBytes(bytes) : 'বাইরের লিংক'}
+                      {yt
+                        ? getYouTubeId(src)
+                        : bytes
+                        ? formatBytes(bytes)
+                        : 'হোস্ট করা লিঙ্ক'}
                       {heavy && (
                         <>
                           {' '}
@@ -382,7 +440,7 @@ const MediaManager = ({ images = [], videos = [], onChange, onError }) => {
                 addVideoUrl();
               }
             }}
-            placeholder="ভিডিওর URL (mp4 / webm) দিয়ে যোগ করুন…"
+            placeholder="YouTube বা mp4/webm লিঙ্ক পেস্ট করুন…"
             aria-label="ভিডিওর URL"
           />
           <button type="button" onClick={addVideoUrl}>
@@ -390,26 +448,35 @@ const MediaManager = ({ images = [], videos = [], onChange, onError }) => {
           </button>
         </div>
 
-        {videoBytes > VIDEO_WARN_BYTES && (
+        {vidUrl.trim() && isYouTubeVideo(vidUrl) && (
+          <div className="mm-yt-preview">
+            <img src={getYouTubeThumbnail(vidUrl)} alt="YouTube প্রিভিউ" />
+            <span>
+              <FiCheck size={13} /> YouTube ভিডিও শনাক্ত হয়েছে
+            </span>
+          </div>
+        )}
+
+        {!storageReady && (
           <p className="mm-warn">
-            <FiAlertTriangle size={13} /> ভিডিওর সাইজ বড় — ব্রাউজার স্টোরেজ
-            (প্রায় ৫MB) ছাড়িয়ে গেলে সেভ হবে না। ছোট ক্লিপ ব্যবহার করুন বা
-            ভিডিওর URL দিন।
+            <FiAlertTriangle size={13} /> Supabase Storage কনফিগার নেই — ফাইল আপলোড
+            কাজ করবে না। Vercel-এ <code>VITE_SUPABASE_URL</code> ও{' '}
+            <code>VITE_SUPABASE_ANON_KEY</code> দিন এবং Supabase-এ{' '}
+            <code>supabase/storage.sql</code> চালান। ততক্ষণ YouTube বা হোস্ট করা
+            ভিডিওর লিঙ্ক ব্যবহার করুন।
           </p>
         )}
       </section>
 
-      {/* ---------------- total budget ---------------- */}
-      <div className={`mm-budget ${overBudget ? 'over' : ''}`}>
-        <span>মোট মিডিয়া সাইজ</span>
-        <b>
-          {formatBytes(totalBytes)} / {formatBytes(STORAGE_BUDGET_BYTES)}
-        </b>
-        {overBudget && (
-          <em>
-            <FiAlertTriangle size={12} /> সীমার কাছাকাছি — কিছু ছবি/ভিডিও সরান
-          </em>
-        )}
+      {/* ---------------- বাজেট ---------------- */}
+      <div className="mm-budget">
+        <span>লোকাল স্টোরেজে মিডিয়া</span>
+        <b>{formatBytes(imageBytes + videoBytes)}</b>
+        <em>
+          {isRemote()
+            ? 'ভিডিও Supabase-এ থাকে — লোকাল স্টোরেজে জায়গা নেয় না'
+            : 'ডেমো মোড: ছবি লোকাল স্টোরেজে থাকে'}
+        </em>
       </div>
     </div>
   );

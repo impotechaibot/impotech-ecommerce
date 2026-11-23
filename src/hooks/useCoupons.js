@@ -1,4 +1,5 @@
 import { createLocalStore } from './createLocalStore.js';
+import { fetchCoupons, saveCoupons } from '../lib/db.js';
 
 /* ==========================================================
    useCoupons — discount codes applied at checkout.
@@ -30,6 +31,8 @@ export const couponsStore = createLocalStore({
   event: 'impotech-coupons-change',
   defaults: [],
   sanitize: normalise,
+  // Supabase থাকলে সেখান থেকেও পড়ে/লেখে — নাহলে লোকালই চলে
+  remote: { fetch: fetchCoupons, save: saveCoupons },
 });
 
 export const readCoupons = couponsStore.read;

@@ -1,13 +1,21 @@
-import { createLocalStore } from './createLocalStore.js';
-
-/* ==========================================================
-   useOrders — orders placed through the checkout.
-
-   The checkout writes a full order record here; the admin panel
-   lists them, changes status, opens the detail and deletes. The
-   Track page reads the same store so a customer can look up a real
-   order id instead of the old demo value.
-   ========================================================== */
+/**
+ * useOrders.js — অর্ডার (Supabase ⇄ লোকাল)
+ * ------------------------------------------------------------
+ * আগে অর্ডার শুধু localStorage-এ থাকত, তাই অ্যাডমিন অন্য ডিভাইসে
+ * অর্ডার দেখত না। এখন db.js দিয়ে Supabase-এ যায়।
+ *
+ * API পুরনো OrderAdmin-এর সাথে সামঞ্জস্যপূর্ণ:
+ *   updateStatus(id, status) · deleteOrder(id) · reset()
+ */
+import { useCallback, useEffect, useState } from 'react';
+import {
+  EVENTS,
+  fetchOrders,
+  updateOrderStatus,
+  deleteOrder as dbDeleteOrder,
+  isRemote,
+} from '../lib/db.js';
+import { toOrder } from '../lib/normalize.js';
 
 export const ORDER_STATUSES = [
   { id: 'new', label: 'নতুন', tone: 'accent' },
@@ -23,38 +31,31 @@ export const statusLabel = (id) =>
 export const statusTone = (id) =>
   ORDER_STATUSES.find((s) => s.id === id)?.tone || 'accent';
 
-const normalise = (list) => {
-  if (!Array.isArray(list)) return [];
-  return list
-    .filter((o) => o && typeof o === 'object' && o.id)
-    .map((o) => ({
-      id: String(o.id),
-      items: Array.isArray(o.items) ? o.items : [],
-      customer: o.customer && typeof o.customer === 'object' ? o.customer : {},
-      payment: o.payment || 'cod',
-      subtotal: Number(o.subtotal) || 0,
-      shipping: Number(o.shipping) || 0,
-      discount: Number(o.discount) || 0,
-      coupon: o.coupon || '',
-      total: Number(o.total) || 0,
-      status: o.status || 'new',
-      note: o.note || '',
-      createdAt: o.createdAt || new Date().toISOString(),
-    }))
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+export const ORDERS_KEY = 'impotech_orders';
+export const ORDERS_EVENT = EVENTS.orders;
+
+/** useBackup এই শেপটা আশা করে। */
+export const ordersStore = {
+  KEY: ORDERS_KEY,
+  EVENT: ORDERS_EVENT,
+  read: () => {
+    try {
+      const raw = localStorage.getItem(ORDERS_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  },
+  clear: () => {
+    try {
+      localStorage.removeItem(ORDERS_KEY);
+    } catch {
+      /* ignore */
+    }
+  },
 };
 
-export const ordersStore = createLocalStore({
-  key: 'impotech_orders',
-  event: 'impotech-orders-change',
-  defaults: [],
-  sanitize: normalise,
-});
-
-export const readOrders = ordersStore.read;
-export const clearOrders = ordersStore.clear;
-
-/** Generate a readable, collision-resistant order id. */
+/** পাঠানোর মতো ইউনিক অর্ডার আইডি। */
 export const makeOrderId = () => {
   const stamp = Date.now().toString(36).toUpperCase().slice(-5);
   const rand = Math.floor(100 + Math.random() * 900);
@@ -62,29 +63,94 @@ export const makeOrderId = () => {
 };
 
 export const useOrders = () => {
-  const { value, isCustom, save, reset, defaults } = ordersStore.useStore();
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState({
+    source: isRemote() ? 'supabase' : 'local',
+    error: null,
+  });
 
-  const addOrder = (order) => {
-    const next = [order, ...value];
-    return save(next) ? order : null;
-  };
+  const load = useCallback(async () => {
+    setLoading(true);
+    const res = await fetchOrders();
+    setOrders((res.data || []).map(toOrder));
+    setStatus({ source: res.source, error: res.error });
+    setLoading(false);
+    return res;
+  }, []);
 
-  const updateStatus = (id, status) =>
-    save(value.map((o) => (o.id === id ? { ...o, status } : o)));
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const res = await fetchOrders();
+      if (!alive) return;
+      setOrders((res.data || []).map(toOrder));
+      setStatus({ source: res.source, error: res.error });
+      setLoading(false);
+    })();
 
-  const deleteOrder = (id) => save(value.filter((o) => o.id !== id));
+    const sync = (e) => {
+      if (Array.isArray(e.detail)) setOrders(e.detail.map(toOrder));
+    };
+    const onStorage = (e) => {
+      if (e.key === ORDERS_KEY) load();
+    };
+    window.addEventListener(ORDERS_EVENT, sync);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      alive = false;
+      window.removeEventListener(ORDERS_EVENT, sync);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, [load]);
 
-  const findOrder = (id) =>
-    value.find((o) => o.id.toUpperCase() === String(id || '').trim().toUpperCase());
+  const updateStatus = useCallback(async (id, next) => {
+    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status: next } : o)));
+    const res = await updateOrderStatus(id, next);
+    if (!res.ok) setStatus((s) => ({ ...s, error: res.error }));
+    return res;
+  }, []);
+
+  const remove = useCallback(async (id) => {
+    setOrders((prev) => prev.filter((o) => o.id !== id));
+    const res = await dbDeleteOrder(id);
+    if (!res.ok) setStatus((s) => ({ ...s, error: res.error }));
+    return res;
+  }, []);
+
+  /** সব অর্ডার মুছে ফেলা (OrderAdmin-এর "সব মুছুন")। */
+  const reset = useCallback(async () => {
+    const current = orders;
+    setOrders([]);
+    for (const o of current) {
+      await dbDeleteOrder(o.id);
+    }
+    return true;
+  }, [orders]);
+
+  const findOrder = useCallback(
+    (id) =>
+      orders.find(
+        (o) =>
+          String(o.id).toUpperCase() === String(id || '').trim().toUpperCase() ||
+          String(o.order_code).toUpperCase() === String(id || '').trim().toUpperCase()
+      ),
+    [orders]
+  );
 
   return {
-    orders: value,
-    isCustom,
-    addOrder,
+    orders,
+    loading,
+    status,
+    isRemote: isRemote(),
+    reload: load,
     updateStatus,
-    deleteOrder,
-    findOrder,
+    remove,
     reset,
-    defaults,
+    findOrder,
+    // পুরনো নাম
+    deleteOrder: remove,
   };
 };
+
+export default useOrders;

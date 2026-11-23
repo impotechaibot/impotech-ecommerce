@@ -5,6 +5,14 @@ import { categoriesStore } from './useCategories.js';
 import { ordersStore } from './useOrders.js';
 import { couponsStore } from './useCoupons.js';
 import { reviewsStore } from './useReviews.js';
+import {
+  replaceProducts,
+  saveCategories,
+  saveCoupons,
+  saveReviews,
+  pushSiteSettings,
+  isRemote,
+} from '../lib/db.js';
 
 /* ==========================================================
    useBackup — export / import / reset the whole site's data.
@@ -69,7 +77,7 @@ export const downloadBackup = () => {
  * each value is re-serialised so a malformed file cannot inject junk.
  * @returns {{ok: boolean, restored: number, reason?: string}}
  */
-export const importBackup = (payload) => {
+export const importBackup = async (payload) => {
   if (!payload || typeof payload !== 'object' || !payload.data)
     return { ok: false, restored: 0, reason: 'ফাইলটি বৈধ ব্যাকআপ নয়' };
 
@@ -84,6 +92,33 @@ export const importBackup = (payload) => {
     });
   } catch (err) {
     return { ok: false, restored, reason: 'সেভ করা যায়নি — স্টোরেজ পূর্ণ হতে পারে' };
+  }
+
+  // রিমোটেও পাঠাই — নাহলে রিস্টোর করা ডেটা লাইভ সাইটে যাবে না
+  if (isRemote()) {
+    try {
+      const read = (k) => {
+        try {
+          const raw = localStorage.getItem(k);
+          return raw ? JSON.parse(raw) : null;
+        } catch {
+          return null;
+        }
+      };
+      const products = read(PRODUCTS_KEY);
+      const cats = read(categoriesStore.KEY);
+      const coupons = read(couponsStore.KEY);
+      const reviews = read(reviewsStore.KEY);
+      const site = read(SITE_KEY);
+
+      if (Array.isArray(products)) await replaceProducts(products);
+      if (Array.isArray(cats)) await saveCategories(cats);
+      if (Array.isArray(coupons)) await saveCoupons(coupons);
+      if (Array.isArray(reviews)) await saveReviews(reviews);
+      if (site && typeof site === 'object') await pushSiteSettings(site);
+    } catch (err) {
+      console.warn('[backup] রিমোট রিস্টোর আংশিক ব্যর্থ', err);
+    }
   }
 
   // Nudge every store to re-read from localStorage.
@@ -103,7 +138,7 @@ export const importBackup = (payload) => {
 };
 
 /** Wipe every admin-editable key back to the built-in defaults. */
-export const resetAll = () => {
+export const resetAll = async () => {
   BACKUP_KEYS.forEach(({ key }) => {
     try {
       localStorage.removeItem(key);
@@ -111,6 +146,18 @@ export const resetAll = () => {
       /* ignore */
     }
   });
+  // রিমোট থেকেও মুছে ফেলি (প্রোডাক্ট/ক্যাটাগরি/কুপন/রিভিউ)
+  if (isRemote()) {
+    try {
+      await replaceProducts([]);
+      await saveCategories([]);
+      await saveCoupons([]);
+      await saveReviews([]);
+    } catch (err) {
+      console.warn('[backup] রিমোট রিসেট আংশিক ব্যর্থ', err);
+    }
+  }
+
   window.dispatchEvent(new Event('storage'));
   window.dispatchEvent(new CustomEvent('impotech-site-change'));
   window.dispatchEvent(new CustomEvent('impotech-products-change'));

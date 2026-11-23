@@ -1,131 +1,166 @@
-import { useCallback, useEffect, useState } from 'react';
-import { products as DEFAULT_PRODUCTS } from '../productsStore/Store.js';
+/**
+ * useProducts.js — প্রোডাক্টের একটাই হুক, একটাই সোর্স
+ * ------------------------------------------------------------
+ * আগে এই হুক শুধু localStorage পড়ত/লিখত, আর পাবলিক পেজ Supabase
+ * পড়ত — তাই অ্যাডমিনের পরিবর্তন লাইভ সাইটে যেত না।
+ *
+ * এখন:
+ *   • মাউন্টে db.fetchProducts() → Supabase (বা লোকাল)
+ *   • save/remove → db.saveProduct()/db.deleteProduct() → Supabase
+ *   • ইভেন্টে সব কম্পোনেন্ট সাথে সাথে রি-রেন্ডার
+ *   • `status` দিয়ে UI জানে ডেটা কোথা থেকে এসেছে ও কী ভুল হয়েছে
+ */
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  EVENTS,
+  fetchProducts,
+  saveProduct,
+  deleteProduct,
+  replaceProducts,
+  isRemote,
+} from '../lib/db.js';
+import { toProduct, uniqueSlug } from '../lib/normalize.js';
 
-// The catalogue in productsStore/Store.js stays the source of truth for the
-// default seed products. Once the admin panel edits/saves anything we keep the
-// full list in localStorage and that copy wins on every route — same pattern as
-// useBackground.js, so cart/wishlist/background all behave the same way.
 export const PRODUCTS_KEY = 'impotech_products';
-export const PRODUCTS_EVENT = 'impotech-products-change';
+export const PRODUCTS_EVENT = EVENTS.products;
 
-const isUsable = (p) =>
-  p && typeof p === 'object' && typeof p.id === 'string' && p.id.length > 0;
+const sortList = (list) =>
+  [...list].sort((a, b) => {
+    const so = Number(a.sort_order || 0) - Number(b.sort_order || 0);
+    if (so !== 0) return so;
+    return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+  });
 
-// Normalise numbers on read so a hand-edited / older payload cannot break maths.
-// `oldPrice` is clamped to at least `price` so the discount maths never divides
-// by a value smaller than the live price (or by zero).
-const normalise = (p) => {
-  const price = Number(p.price) || 0;
-  const oldPrice = Math.max(price, Number(p.oldPrice) || 0);
-  return {
-    ...p,
-    price,
-    oldPrice,
-    stock: Number(p.stock) || 0,
-    rating: Number(p.rating) || 0,
-    reviews: Number(p.reviews) || 0,
-    // `images` is the current field; a legacy record may only carry a single
-    // `image` string, so fold that in when the array is missing/empty.
-    images: (() => {
-      const list = Array.isArray(p.images) ? p.images.filter(Boolean) : [];
-      if (list.length) return list;
-      return typeof p.image === 'string' && p.image ? [p.image] : [];
-    })(),
-    videos: Array.isArray(p.videos) ? p.videos.filter(Boolean) : [],
-    // Per-product setting: when true the detail gallery auto-plays a selected
-    // video muted (with a mute/unmute control) instead of waiting for a click.
-    videoAutoplay: Boolean(p.videoAutoplay),
-    colors: Array.isArray(p.colors) ? p.colors : [],
-    features: Array.isArray(p.features) ? p.features : [],
-    bn: p.bn || p.name || 'পণ্য',
-    name: p.name || p.bn || 'Product',
-  };
-};
-
-export const readProducts = () => {
-  try {
-    const raw = localStorage.getItem(PRODUCTS_KEY);
-    if (!raw) return DEFAULT_PRODUCTS;
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return DEFAULT_PRODUCTS;
-    const clean = parsed.filter(isUsable).map(normalise);
-    if (!clean.length) return DEFAULT_PRODUCTS;
-    return clean;
-  } catch {
-    return DEFAULT_PRODUCTS;
-  }
-};
-
-export const hasCustomProducts = () => {
-  try {
-    return Boolean(localStorage.getItem(PRODUCTS_KEY));
-  } catch {
-    return false;
-  }
-};
-
-/** Returns true when the write actually landed (localStorage can be full). */
-export const writeProducts = (list) => {
-  try {
-    localStorage.setItem(PRODUCTS_KEY, JSON.stringify(list));
-    window.dispatchEvent(new CustomEvent(PRODUCTS_EVENT, { detail: list }));
-    return true;
-  } catch (err) {
-    console.warn('Products could not be saved', err);
-    return false;
-  }
-};
-
-export const clearProducts = () => {
-  try {
-    localStorage.removeItem(PRODUCTS_KEY);
-    window.dispatchEvent(
-      new CustomEvent(PRODUCTS_EVENT, { detail: DEFAULT_PRODUCTS })
-    );
-  } catch (err) {
-    console.warn('Products could not be reset', err);
-  }
-};
-
-// One hook, one source of truth — every consumer re-renders on save and other
-// tabs stay in sync through the `storage` event.
 export const useProducts = () => {
-  const [state, setState] = useState(() => ({
-    list: readProducts(),
-    custom: hasCustomProducts(),
-  }));
+  const [list, setList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState({
+    source: isRemote() ? 'supabase' : 'local',
+    error: null,
+  });
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const res = await fetchProducts();
+    setList(sortList(res.data || []));
+    setStatus({ source: res.source, error: res.error });
+    setLoading(false);
+    return res;
+  }, []);
 
   useEffect(() => {
-    const sync = () => {
-      setState({ list: readProducts(), custom: hasCustomProducts() });
+    let alive = true;
+    (async () => {
+      const res = await fetchProducts();
+      if (!alive) return;
+      setList(sortList(res.data || []));
+      setStatus({ source: res.source, error: res.error });
+      setLoading(false);
+    })();
+
+    const sync = (e) => {
+      if (Array.isArray(e.detail)) setList(sortList(e.detail.map(toProduct)));
     };
     const onStorage = (e) => {
-      if (e.key === PRODUCTS_KEY) sync();
+      if (e.key === PRODUCTS_KEY) load();
     };
     window.addEventListener(PRODUCTS_EVENT, sync);
     window.addEventListener('storage', onStorage);
     return () => {
+      alive = false;
       window.removeEventListener(PRODUCTS_EVENT, sync);
       window.removeEventListener('storage', onStorage);
     };
+  }, [load]);
+
+  /** নতুন প্রোডাক্ট যোগ — slug ইউনিক করে, তারপর সেভ। */
+  const add = useCallback(
+    async (draft) => {
+      const taken = list.map((p) => p.slug);
+      const base = draft.slug || draft.name_bn || draft.name;
+      const product = toProduct({
+        ...draft,
+        id: draft.id || `p-${Date.now().toString(36)}`,
+        slug: uniqueSlug(base, taken),
+      });
+      const res = await saveProduct(product);
+      if (res.ok) {
+        setList((prev) =>
+          sortList([res.data, ...prev.filter((p) => p.id !== res.data.id)])
+        );
+        setStatus({ source: res.source, error: null });
+      } else {
+        setStatus((s) => ({ ...s, error: res.error }));
+      }
+      return res;
+    },
+    [list]
+  );
+
+  /** পুরনো প্রোডাক্ট আপডেট। */
+  const update = useCallback(async (id, draft) => {
+    const product = toProduct({ ...draft, id });
+    const res = await saveProduct(product);
+    if (res.ok) {
+      setList((prev) => sortList(prev.map((p) => (p.id === id ? res.data : p))));
+      setStatus({ source: res.source, error: null });
+    } else {
+      setStatus((s) => ({ ...s, error: res.error }));
+    }
+    return res;
   }, []);
 
-  const save = useCallback((list) => {
-    const ok = writeProducts(list);
-    if (ok) setState({ list, custom: true });
-    return ok;
+  const remove = useCallback(async (id) => {
+    const res = await deleteProduct(id);
+    if (res.ok) {
+      setList((prev) => prev.filter((p) => p.id !== id));
+      setStatus((s) => ({ ...s, error: null }));
+    } else {
+      setStatus((s) => ({ ...s, error: res.error }));
+    }
+    return res;
   }, []);
 
-  const reset = useCallback(() => {
-    clearProducts();
-    setState({ list: DEFAULT_PRODUCTS, custom: false });
+  /** পুরো তালিকা একবারে (রিসেট / ইমপোর্ট)। */
+  const replaceAll = useCallback(async (next) => {
+    const res = await replaceProducts(next);
+    if (res.ok) {
+      setList(sortList(res.data));
+      setStatus({ source: res.source, error: null });
+    } else {
+      setStatus((s) => ({ ...s, error: res.error }));
+    }
+    return res;
   }, []);
+
+  const byId = useMemo(() => {
+    const map = new Map();
+    list.forEach((p) => map.set(p.id, p));
+    return map;
+  }, [list]);
+
+  const bySlug = useMemo(() => {
+    const map = new Map();
+    list.forEach((p) => {
+      if (p.slug) map.set(p.slug, p);
+      map.set(p.id, p);
+    });
+    return map;
+  }, [list]);
 
   return {
-    products: state.list,
-    isCustom: state.custom,
-    save,
-    reset,
-    defaults: DEFAULT_PRODUCTS,
+    products: list,
+    loading,
+    status,
+    isRemote: isRemote(),
+    reload: load,
+    add,
+    update,
+    remove,
+    replaceAll,
+    byId,
+    bySlug,
   };
 };
+
+export default useProducts;

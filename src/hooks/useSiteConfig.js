@@ -151,7 +151,8 @@ export const DEFAULT_SITE = {
 
   /* ---- checkout / payment ---- */
   checkout: {
-    deliveryCharge: 80,
+    deliveryCharge: 100,
+    outsideDeliveryCharge: 130,
     freeDeliveryAbove: 2000,
     codEnabled: true,
     bkashEnabled: true,
@@ -351,13 +352,30 @@ export const useSiteConfig = () => {
   }, []);
 
   /** save(patch) merges a partial update; save(fn) gets the current config.
-   *  শুধু localStorage-এ লেখে (sync, boolean ফেরত দেয়)। */
+   *
+   *  ⚠️ আগের বাগ: এখানে শুধু localStorage-এ লেখা হত, তাই অ্যাডমিনের
+   *  সব সেটিং (ডেলিভারি চার্জ, থিম, কনটেন্ট) লাইভ সাইটে কখনো যেত না।
+   *  এখন localStorage-এ সাথে সাথে লেখে **এবং** Supabase-এ push করে।
+   *  sync boolean ফেরত দেয় (localStorage সফল হয়েছে কি না) — পুরনো
+   *  কলাররা ভাঙে না; রিমোট স্টেটাস `remoteStatus`-এ পাওয়া যায়।
+   */
   const save = useCallback((patch) => {
     const current = readSiteConfig();
     const next =
       typeof patch === 'function' ? patch(current) : mergeDeep(current, patch);
     const ok = writeSiteConfig(next);
     if (ok) setConfig(next);
+
+    // রিমোটে পাঠানো (fire-and-forget — UI ব্লক হয় না)
+    if (isSupabaseConfigured) {
+      setRemoteStatus('saving');
+      pushRemoteSiteConfig(next).then((res) => {
+        if (res.ok) setRemoteStatus('synced');
+        else if (res.reason === 'not-configured') setRemoteStatus('disabled');
+        else setRemoteStatus('offline');
+      });
+    }
+
     return ok;
   }, []);
 

@@ -1,62 +1,138 @@
-import { createLocalStore } from './createLocalStore.js';
+/**
+ * useCategories.js — ক্যাটাগরি (Supabase ⇄ লোকাল)
+ * ------------------------------------------------------------
+ * আগে শুধু localStorage-এ থাকত, তাই অ্যাডমিনে নতুন ক্যাটাগরি
+ * যোগ করলে লাইভ সাইটে আসত না। এখন db.js দিয়ে যায়।
+ *
+ * API পুরনো CategoryAdmin-এর সাথে সামঞ্জস্যপূর্ণ:
+ *   save(list) → boolean (sync, আগের মতোই)
+ *   reset()    → ডিফল্টে ফেরা
+ *   isCustom   → ডিফল্টের বাইরে কিছু আছে কি না
+ */
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { categories as DEFAULT_CATEGORIES } from '../productsStore/Store.js';
+import { EVENTS, fetchCategories, saveCategories, isRemote } from '../lib/db.js';
+import { toCategory, slugify } from '../lib/normalize.js';
 
-/* ==========================================================
-   useCategories — admin-managed category list.
+const SEED = DEFAULT_CATEGORIES.map((c, i) =>
+  toCategory(
+    { id: c.id, name: c.name, name_bn: c.name, nameEn: c.name, image: c.image, sort_order: i },
+    i
+  )
+);
 
-   The seed list still comes from productsStore/Store.js; once the
-   admin edits anything the full list lives in localStorage and that
-   copy wins. Order is explicit (`order` field) so the home strip and
-   the product filters can be re-arranged from the panel.
-   ========================================================== */
+export const CATEGORIES_KEY = 'impotech_categories';
+export const CATEGORIES_EVENT = EVENTS.categories;
 
-const SEED = DEFAULT_CATEGORIES.map((c, i) => ({
-  id: c.id,
-  name: c.name,
-  nameEn: '',
-  image: c.image,
-  order: i,
-  active: true,
-}));
+export const slugifyCategory = (text) => slugify(text, 'category');
 
-const normalise = (list) => {
-  if (!Array.isArray(list)) return SEED;
-  const clean = list
-    .filter((c) => c && typeof c === 'object' && c.id)
-    .map((c, i) => ({
-      id: String(c.id),
-      name: c.name || String(c.id),
-      nameEn: c.nameEn || '',
-      image: c.image || '',
-      order: Number.isFinite(Number(c.order)) ? Number(c.order) : i,
-      active: c.active !== false,
-    }))
-    .sort((a, b) => a.order - b.order)
-    .map((c, i) => ({ ...c, order: i }));
-  return clean.length ? clean : SEED;
+/** useBackup এই শেপটা আশা করে। */
+export const categoriesStore = {
+  KEY: CATEGORIES_KEY,
+  EVENT: CATEGORIES_EVENT,
+  read: () => {
+    try {
+      const raw = localStorage.getItem(CATEGORIES_KEY);
+      return raw ? JSON.parse(raw) : SEED;
+    } catch {
+      return SEED;
+    }
+  },
+  clear: () => {
+    try {
+      localStorage.removeItem(CATEGORIES_KEY);
+    } catch {
+      /* ignore */
+    }
+  },
 };
-
-export const categoriesStore = createLocalStore({
-  key: 'impotech_categories',
-  event: 'impotech-categories-change',
-  defaults: SEED,
-  sanitize: normalise,
-});
-
-export const readCategories = categoriesStore.read;
-export const hasCustomCategories = categoriesStore.has;
-export const clearCategories = categoriesStore.clear;
-
-/** Slugify a category name into a URL-safe id. */
-export const slugifyCategory = (text) =>
-  String(text || '')
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\u0980-\u09FF]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 40) || 'category';
 
 export const useCategories = () => {
-  const { value, isCustom, save, reset, defaults } = categoriesStore.useStore();
-  return { categories: value, isCustom, save, reset, defaults };
+  const [categories, setCategories] = useState(SEED);
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState({
+    source: isRemote() ? 'supabase' : 'local',
+    error: null,
+  });
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const res = await fetchCategories();
+    const list = (res.data || []).map((c, i) => toCategory(c, i));
+    setCategories(list.length ? list : SEED);
+    setStatus({ source: res.source, error: res.error });
+    setLoading(false);
+    return res;
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const res = await fetchCategories();
+      if (!alive) return;
+      const list = (res.data || []).map((c, i) => toCategory(c, i));
+      setCategories(list.length ? list : SEED);
+      setStatus({ source: res.source, error: res.error });
+      setLoading(false);
+    })();
+
+    const sync = (e) => {
+      if (Array.isArray(e.detail)) setCategories(e.detail.map((c, i) => toCategory(c, i)));
+    };
+    const onStorage = (e) => {
+      if (e.key === CATEGORIES_KEY) load();
+    };
+    window.addEventListener(CATEGORIES_EVENT, sync);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      alive = false;
+      window.removeEventListener(CATEGORIES_EVENT, sync);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, [load]);
+
+  /**
+   * sync boolean ফেরত দেয় (পুরনো কলারদের জন্য), আর রিমোটে
+   * ব্যাকগ্রাউন্ডে push করে — ব্যর্থ হলে `status.error`-এ ধরা পড়ে।
+   */
+  const save = useCallback((list) => {
+    const clean = (Array.isArray(list) ? list : [])
+      .map((c, i) => toCategory(c, i))
+      .filter((c) => c.id);
+    setCategories(clean);
+
+    saveCategories(clean).then((res) => {
+      if (res.ok) setStatus({ source: res.source, error: null });
+      else setStatus((s) => ({ ...s, error: res.error }));
+    });
+
+    return true;
+  }, []);
+
+  const reset = useCallback(() => {
+    setCategories(SEED);
+    saveCategories(SEED).then((res) => {
+      if (!res.ok) setStatus((s) => ({ ...s, error: res.error }));
+    });
+    return true;
+  }, []);
+
+  const isCustom = useMemo(() => {
+    if (categories.length !== SEED.length) return true;
+    return categories.some((c, i) => c.id !== SEED[i]?.id || c.name !== SEED[i]?.name);
+  }, [categories]);
+
+  return {
+    categories,
+    loading,
+    status,
+    isRemote: isRemote(),
+    isCustom,
+    reload: load,
+    save,
+    reset,
+    defaults: SEED,
+  };
 };
+
+export default useCategories;

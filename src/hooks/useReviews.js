@@ -1,4 +1,5 @@
 import { createLocalStore } from './createLocalStore.js';
+import { fetchReviews, saveReviews } from '../lib/db.js';
 
 /* ==========================================================
    useReviews — product reviews shown in the admin panel.
@@ -29,6 +30,7 @@ export const reviewsStore = createLocalStore({
   event: 'impotech-reviews-change',
   defaults: [],
   sanitize: normalise,
+  remote: { fetch: fetchReviews, save: saveReviews },
 });
 
 export const readReviews = reviewsStore.read;

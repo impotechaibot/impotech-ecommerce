@@ -53,6 +53,19 @@ const CheckoutAdmin = () => {
               }
             />
           </AdField>
+          <AdField
+            label="ঢাকার বাইরে ডেলিভারি চার্জ (৳)"
+            hint="চেকআউটে 'ঢাকার বাইরে' বেছে নিলে এই চার্জ প্রযোজ্য"
+          >
+            <AdInput
+              type="text"
+              inputMode="numeric"
+              value={draft.outsideDeliveryCharge ?? ''}
+              onChange={(e) =>
+                update({ outsideDeliveryCharge: e.target.value.replace(/[^0-9]/g, '') })
+              }
+            />
+          </AdField>
           <AdField label="ফ্রি ডেলিভারির ন্যূনতম অর্ডার (৳)" hint="০ দিলে ফ্রি ডেলিভারি বন্ধ">
             <AdInput
               type="text"

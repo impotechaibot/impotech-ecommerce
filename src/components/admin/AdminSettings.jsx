@@ -28,7 +28,10 @@ const AdminSettings = ({ onLogout }) => {
 
   const changePassword = (e) => {
     e.preventDefault();
-    if (current !== config.admin.password) {
+    // ⚠️ আগের বাগ: config.admin না থাকলে (পুরনো/রিমোট কনফিগ) এখানে
+    // TypeError হয়ে পুরো অ্যাডমিন প্যানেল সাদা হয়ে যেত।
+    const storedPassword = config?.admin?.password || 'impotech2026';
+    if (current !== storedPassword) {
       setError('বর্তমান পাসওয়ার্ড ভুল');
       return;
     }

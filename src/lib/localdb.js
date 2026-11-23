@@ -81,7 +81,7 @@ function seed() {
   ];
 
   const services = [
-    { id: 'srv-1', name: 'Home Delivery', name_bn: 'হোম ডেলিভারি', slug: 'home-delivery', icon: '🚚', short_desc: 'সারা বাংলাদেশে দ্রুত হোম ডেলিভারি।', description: 'আমরা সারা বাংলাদেশে ২–৪ কর্মদিবসের মধ্যে পণ্য পৌঁছে দিই।', price: 80, duration: '২–৪ দিন', status: 'active', sort_order: 0, images: [ph('DELIVERY', '#0a1226')], videos: [], created_at: daysAgo(10) },
+    { id: 'srv-1', name: 'Home Delivery', name_bn: 'হোম ডেলিভারি', slug: 'home-delivery', icon: '🚚', short_desc: 'সারা বাংলাদেশে দ্রুত হোম ডেলিভারি।', description: 'আমরা সারা বাংলাদেশে ২–৪ কর্মদিবসের মধ্যে পণ্য পৌঁছে দিই।', price: 100, duration: '২–৪ দিন', status: 'active', sort_order: 0, images: [ph('DELIVERY', '#0a1226')], videos: [], created_at: daysAgo(10) },
     { id: 'srv-2', name: 'Installation Service', name_bn: 'ইনস্টলেশন সার্ভিস', slug: 'installation-service', icon: '🔧', short_desc: 'পণ্য কেনার সাথে ফ্রি ইনস্টলেশন।', description: 'LED লাইট, হর্ন বা যেকোনো অ্যাকসেসরির প্রফেশনাল ইনস্টলেশন।', price: 0, duration: '১ দিন', status: 'active', sort_order: 1, images: [ph('INSTALL', '#07130f')], videos: [], created_at: daysAgo(9) },
     { id: 'srv-3', name: 'Warranty & Replacement', name_bn: 'ওয়ারেন্টি ও রিপ্লেসমেন্ট', slug: 'warranty-replacement', icon: '🛡️', short_desc: '৭ দিনের রিপ্লেসমেন্ট গ্যারান্টি।', description: 'পণ্য পাওয়ার ৭ দিনের মধ্যে কোনো সমস্যা থাকলে বিনামূল্যে রিপ্লেসমেন্ট।', price: 0, duration: '৭ দিন', status: 'active', sort_order: 2, images: [ph('WARRANTY', '#150a1c')], videos: [], created_at: daysAgo(8) },
     { id: 'srv-4', name: 'Cash on Delivery', name_bn: 'ক্যাশ অন ডেলিভারি', slug: 'cash-on-delivery', icon: '💵', short_desc: 'পণ্য হাতে পেয়ে টাকা দিন।', description: 'সারা দেশে ক্যাশ অন ডেলিভারি সুবিধা।', price: 0, duration: 'সাথে সাথে', status: 'active', sort_order: 3, images: [ph('COD', '#0a1226')], videos: [], created_at: daysAgo(7) },
@@ -117,7 +117,7 @@ function seed() {
       facebook: '', instagram: '', youtube: '', tiktok: '',
     },
     checkout: {
-      deliveryCharge: 80, freeDeliveryAbove: 2000, codEnabled: true,
+      deliveryCharge: 100, outsideDeliveryCharge: 130, freeDeliveryAbove: 2000, codEnabled: true,
       bkashEnabled: true, bkashNumber: '01884332067',
       nagadEnabled: true, nagadNumber: '01884332067',
       rocketEnabled: false, rocketNumber: '',

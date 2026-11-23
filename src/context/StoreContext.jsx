@@ -23,6 +23,8 @@ import {
 } from '../lib/supabase.js';
 
 import { localdb } from '../lib/localdb.js';
+import { EVENTS } from '../lib/db.js';
+import { toProduct, toCategory } from '../lib/normalize.js';
 import * as cartLib from '../lib/cart.js';
 
 const StoreContext = createContext(null);
@@ -62,87 +64,109 @@ export function StoreProvider({ children }) {
   const loadAll = useCallback(async () => {
     setLoading(true);
 
-    try {
-      if (isSupabaseConfigured) {
-        const [p, c, s, f, pol, st] = await Promise.all([
+    /* ------------------------------------------------------------
+       ⚠️ আগের বাগ: ছয়টা টেবিল একসাথে চাওয়া হত, আর **একটাও** এরর
+       দিলে (যেমন `services` বা `policies` টেবিল না থাকলে) পুরো
+       সাইট ডেমো ডেটায় নেমে যেত — ফলে অ্যাডমিনে যোগ করা প্রোডাক্ট
+       ও ভিডিও লাইভ সাইটে কখনো দেখা যেত না।
+
+       এখন প্রতিটা টেবিল আলাদাভাবে আনা হয়: যেটা পাওয়া যায় সেটা
+       দেখাই, যেটা না পাওয়া যায় শুধু সেটার জন্য ফলব্যাক।
+       ------------------------------------------------------------ */
+
+    const safe = async (label, query, fallback) => {
+      try {
+        const { data, error } = await query;
+        if (error) {
+          console.warn(`[store] ${label} লোড হয়নি:`, error.message);
+          return fallback();
+        }
+        return data || [];
+      } catch (err) {
+        console.warn(`[store] ${label} লোড হয়নি:`, err?.message || err);
+        return fallback();
+      }
+    };
+
+    if (isSupabaseConfigured) {
+      const [p, c, s, f, pol, st] = await Promise.all([
+        safe(
+          'products',
           supabase
             .from('products')
             .select('*')
-            .eq('active', true)
+            .order('sort_order', { ascending: true })
             .order('created_at', { ascending: false }),
+          () => localdb.listProducts()
+        ),
+        safe(
+          'categories',
+          supabase.from('categories').select('*').order('sort_order'),
+          () => localdb.listCategories()
+        ),
+        safe(
+          'services',
+          supabase.from('services').select('*').order('sort_order'),
+          () => localdb.listServices()
+        ),
+        safe(
+          'faqs',
+          supabase.from('faqs').select('*').order('sort_order'),
+          () => localdb.listFaqs()
+        ),
+        safe(
+          'policies',
+          supabase.from('policies').select('*'),
+          () => localdb.listPolicies()
+        ),
+        safe(
+          'site_settings',
+          supabase.from('site_settings').select('*'),
+          () => []
+        ),
+      ]);
 
-          supabase
-            .from('categories')
-            .select('*')
-            .eq('active', true)
-            .order('sort_order'),
+      // প্রোডাক্ট ক্যানোনিকাল শেপে (snake_case) — পাবলিক পেজ এটাই পড়ে
+      setProducts((p || []).map(toProduct).filter((x) => x.id));
+      setCategories((c || []).map((x, i) => toCategory(x, i)));
+      setServices(s || []);
+      setFaqs(f || []);
+      setPolicies(pol || []);
 
-          supabase
-            .from('services')
-            .select('*')
-            .eq('status', 'active')
-            .order('sort_order'),
-
-          supabase
-            .from('faqs')
-            .select('*')
-            .eq('active', true)
-            .order('sort_order'),
-
-          supabase
-            .from('policies')
-            .select('*')
-            .eq('active', true),
-
-          supabase
-            .from('site_settings')
-            .select('*'),
-        ]);
-
-        // Supabase query error থাকলে fallback
-        const results = [p, c, s, f, pol, st];
-        const failed = results.find((result) => result.error);
-
-        if (failed) {
-          throw failed.error;
-        }
-
-        setProducts(p.data || []);
-        setCategories(c.data || []);
-        setServices(s.data || []);
-        setFaqs(f.data || []);
-        setPolicies(pol.data || []);
-
-        const map = {};
-
-        (st.data || []).forEach((row) => {
-          map[row.key] = row.value;
-        });
-
-        setSettings(map);
-      } else {
-        // Demo mode
-        setProducts(localdb.listProducts());
-        setCategories(localdb.listCategories());
-        setServices(localdb.listServices());
-        setFaqs(localdb.listFaqs());
-        setPolicies(localdb.listPolicies());
-        setSettings(localdb.getAllSettings());
-      }
-    } catch (e) {
-      console.error('Store load failed, falling back to demo:', e);
-
-      setProducts(localdb.listProducts());
-      setCategories(localdb.listCategories());
+      const map = {};
+      (st || []).forEach((row) => {
+        map[row.key] = row.value;
+      });
+      setSettings(map);
+    } else {
+      // Demo mode
+      setProducts(localdb.listProducts().map(toProduct));
+      setCategories(localdb.listCategories().map((x, i) => toCategory(x, i)));
       setServices(localdb.listServices());
       setFaqs(localdb.listFaqs());
       setPolicies(localdb.listPolicies());
       setSettings(localdb.getAllSettings());
-    } finally {
-      setCart(cartLib.getCart());
-      setWishlist(cartLib.getWishlist());
-      setLoading(false);
     }
+
+    setCart(cartLib.getCart());
+    setWishlist(cartLib.getWishlist());
+    setLoading(false);
+  }, []);
+
+  /* অ্যাডমিন কিছু বদলালে সাথে সাথে পাবলিক পেজ আপডেট */
+  useEffect(() => {
+    const onProducts = (e) => {
+      if (Array.isArray(e.detail)) setProducts(e.detail.map(toProduct));
+    };
+    const onCategories = (e) => {
+      if (Array.isArray(e.detail)) setCategories(e.detail.map((c, i) => toCategory(c, i)));
+    };
+    window.addEventListener(EVENTS.products, onProducts);
+    window.addEventListener(EVENTS.categories, onCategories);
+    return () => {
+      window.removeEventListener(EVENTS.products, onProducts);
+      window.removeEventListener(EVENTS.categories, onCategories);
+    };
   }, []);
 
   useEffect(() => {

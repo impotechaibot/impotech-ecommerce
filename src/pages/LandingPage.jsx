@@ -6,6 +6,8 @@ import {
 import toast from 'react-hot-toast';
 import { useStore } from '../context/StoreContext.jsx';
 import { localdb } from '../lib/localdb.js';
+import { calcShipping } from '../lib/delivery.js';
+import VideoPlayer from '../components/VideoPlayer.jsx';
 import { money, discountPercent, toBn } from '../lib/format.js';
 import Seo from '../components/Seo.jsx';
 import Loader from '../components/Loader.jsx';
@@ -62,6 +64,7 @@ export default function LandingPage() {
     );
   }
 
+  const checkoutCfg = settings?.checkout || {};
   const images = (product.images || []).filter(Boolean);
   const videos = (product.videos || []).filter(Boolean);
   const off = discountPercent(product.price, product.old_price);
@@ -77,7 +80,9 @@ export default function LandingPage() {
     try {
       const qty = Math.max(1, Number(form.qty) || 1);
       const subtotal = Number(product.price) * qty;
-      const shipping = 80;
+      const shipping = calcShipping(subtotal, checkoutCfg, {
+        freeDelivery: product.free_delivery === true,
+      });
       const saved = localdb.placeOrder({
         order_code: localdb.nextOrderCode(),
         customer_name: form.name.trim(),
@@ -204,16 +209,13 @@ export default function LandingPage() {
           <h2 className="text-2xl font-semibold text-center mb-8">ভিডিও</h2>
           <div className="grid sm:grid-cols-2 gap-5 max-w-4xl mx-auto">
             {videos.map((v, i) => (
-              <div key={i} className="relative card overflow-hidden aspect-video bg-black">
-                <video src={v} className="w-full h-full object-contain" muted={muted} autoPlay loop playsInline />
-                <button
-                  onClick={() => setMuted((m) => !m)}
-                  className="absolute bottom-3 right-3 w-9 h-9 grid place-items-center rounded-full bg-black/60 text-white"
-                  aria-label="সাউন্ড"
-                >
-                  {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-                </button>
-              </div>
+              <VideoPlayer
+                key={v.slice(0, 50) + i}
+                src={v}
+                poster={images[0]}
+                autoplay={Boolean(product.video_autoplay)}
+                className="card overflow-hidden aspect-video"
+              />
             ))}
           </div>
         </section>
@@ -270,11 +272,11 @@ export default function LandingPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-ink-muted">ডেলিভারি চার্জ</span>
-                <span>{money(80)}</span>
+                <span>{money(calcShipping(Number(product.price) * Math.max(1, Number(form.qty) || 1), checkoutCfg, { freeDelivery: product.free_delivery === true }))}</span>
               </div>
               <div className="flex justify-between font-semibold border-t border-line pt-2">
                 <span>সর্বমোট</span>
-                <span className="text-accent">{money(Number(product.price) * Math.max(1, Number(form.qty) || 1) + 80)}</span>
+                <span className="text-accent">{money(Number(product.price) * Math.max(1, Number(form.qty) || 1) + calcShipping(Number(product.price) * Math.max(1, Number(form.qty) || 1), checkoutCfg, { freeDelivery: product.free_delivery === true }))}</span>
               </div>
             </div>
 

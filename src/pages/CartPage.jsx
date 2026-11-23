@@ -4,12 +4,17 @@ import { FiMinus, FiPlus, FiTrash2, FiShoppingBag, FiArrowRight } from 'react-ic
 import { cartActions } from '../redux-state/CartState.js';
 import { useCartWithProducts } from '../hooks/useCartWithProducts.js';
 import { formatMoney, productImage } from '../utils/format.js';
+import { useSiteConfig } from '../hooks/useSiteConfig.js';
+import { calcShipping, amountToFreeDelivery } from '../lib/delivery.js';
 import '../styles/CartPage.css';
 
 const CartPage = () => {
   const dispatch = useDispatch();
   const { items, total } = useCartWithProducts();
-  const shipping = total > 0 ? (total >= 2000 ? 0 : 80) : 0;
+  const { config } = useSiteConfig();
+  // চার্জ অ্যাডমিন থেকে (আগে এখানে ৮০ হার্ডকোড ছিল)
+  const shipping = total > 0 ? calcShipping(total, config?.checkout || {}) : 0;
+  const freeLeft = amountToFreeDelivery(total, config?.checkout || {});
 
   if (items.length === 0) {
     return (
@@ -123,9 +128,9 @@ const CartPage = () => {
               <span>ডেলিভারি</span>
               <b>{shipping === 0 ? 'ফ্রি' : formatMoney(shipping)}</b>
             </div>
-            {shipping > 0 && (
+            {shipping > 0 && freeLeft > 0 && (
               <p className="cs-hint">
-                {formatMoney(2000 - total)} আরও কিনলে ডেলিভারি ফ্রি!
+                {formatMoney(freeLeft)} আরও কিনলে ডেলিভারি ফ্রি!
               </p>
             )}
             <div className="cs-total">

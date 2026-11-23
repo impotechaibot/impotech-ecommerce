@@ -24,6 +24,7 @@ import {
 import toast from 'react-hot-toast';
 import { useStore } from '../context/StoreContext.jsx';
 import { localdb } from '../lib/localdb.js';
+import VideoPlayer, { normalizeVideoList } from '../components/VideoPlayer.jsx';
 import { supabase } from '../lib/supabase.js';
 import { money, discountPercent, stockStatus, dateBn, toBn } from '../lib/format.js';
 import { productJsonLd } from '../lib/seo.js';
@@ -178,8 +179,9 @@ export default function ProductDetail() {
     [product]
   );
 
+  // পুরনো `{url}` ফরম্যাটও স্ট্রিং URL-এ নামিয়ে আনি
   const videos = useMemo(
-    () => asArray(product?.videos).filter(Boolean),
+    () => normalizeVideoList(product?.videos),
     [product]
   );
 
@@ -861,7 +863,7 @@ export default function ProductDetail() {
               </div>
             )}
 
-            {/* ---------- ভিডিও: YouTube + Direct ---------- */}
+            {/* ---------- ভিডিও: YouTube + Direct (শেয়ারড প্লেয়ার) ---------- */}
             {tab === 'video' && (
               <div>
                 {videos.length === 0 ? (
@@ -870,100 +872,36 @@ export default function ProductDetail() {
                   </div>
                 ) : (
                   <>
-                    <div className="pd-video-stage">
-                      {isYouTubeVideo(videos[activeVideo]) ? (
-                        /* YouTube Player */
-                        <iframe
-                          key={`${getYouTubeId(videos[activeVideo])}-${muted}`}
-                          src={`https://www.youtube.com/embed/${getYouTubeId(
-                            videos[activeVideo]
-                          )}?autoplay=1&mute=${muted ? 1 : 0}&playsinline=1&rel=0`}
-                          title={`YouTube Video ${activeVideo + 1}`}
-                          className="pd-main-video"
-                          allow="autoplay; encrypted-media; picture-in-picture"
-                          allowFullScreen
-                          loading="eager"
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            border: 0,
-                          }}
-                        />
-                      ) : (
-                        /* Direct MP4/WebM Video */
-                        <video
-                          ref={videoRef}
-                          key={videos[activeVideo]}
-                          src={videos[activeVideo]}
-                          className="pd-main-video"
-                          muted={muted}
-                          autoPlay
-                          loop
-                          playsInline
-                          controls
-                          onClick={(e) => {
-                            const v = e.currentTarget;
-
-                            if (v.paused) {
-                              v.play().catch((error) => {
-                                console.warn('Video playback error:', error);
-                              });
-                            } else {
-                              v.pause();
-                            }
-                          }}
-                        />
-                      )}
-
-                      {/* Mute button — YouTube-এ iframe remount করে */}
-                      <button
-                        type="button"
-                        onClick={() => setMuted((v) => !v)}
-                        className="pd-mute"
-                        aria-label={muted ? 'সাউন্ড চালু' : 'সাউন্ড বন্ধ'}
-                      >
-                        {muted ? (
-                          <VolumeX size={17} />
-                        ) : (
-                          <Volume2 size={17} />
-                        )}
-                      </button>
-                    </div>
+                    <VideoPlayer
+                      key={videos[activeVideo]}
+                      src={videos[activeVideo]}
+                      poster={images[0]}
+                      autoplay={Boolean(product?.video_autoplay)}
+                      className="pd-main-video"
+                    />
 
                     {/* ভিডিও থাম্বনেইল */}
                     {videos.length > 1 && (
-                      <div
-                        className="pd-thumbs pd-vthumbs"
-                        style={{ marginTop: 10 }}
-                      >
+                      <div className="pd-thumbs pd-vthumbs" style={{ marginTop: 10 }}>
                         {videos.map((v, i) => {
                           const yt = isYouTubeVideo(v);
-                          const thumbnail = yt
-                            ? getYouTubeThumbnail(v)
-                            : '';
-
                           return (
                             <button
                               type="button"
-                              key={i}
+                              key={v.slice(0, 50) + i}
                               onClick={() => setActiveVideo(i)}
                               className={i === activeVideo ? 'on' : ''}
                               aria-label={`ভিডিও ${i + 1}`}
                             >
                               {yt ? (
                                 <img
-                                  src={thumbnail}
+                                  src={getYouTubeThumbnail(v)}
                                   alt={`YouTube ভিডিও ${i + 1}`}
                                   loading="lazy"
                                 />
                               ) : (
-                                <video
-                                  src={v}
-                                  muted
-                                  preload="metadata"
-                                />
+                                <video src={v} muted preload="metadata" />
                               )}
-
                               <span className="pd-thumb-play">
                                 <Play size={15} />
                               </span>

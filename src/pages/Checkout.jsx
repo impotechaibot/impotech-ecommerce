@@ -69,16 +69,17 @@ export default function Checkout() {
   // Admin settings
   const checkoutSettings = settings?.checkout || {};
 
+  // ডিফল্ট মান এক জায়গা থেকেই আসে (lib/delivery.js)
   const deliveryInside = Number(
-    checkoutSettings.deliveryCharge ?? 80
+    checkoutSettings.deliveryCharge ?? DEFAULT_DELIVERY_CHARGE
   );
 
   const deliveryOutside = Number(
-    checkoutSettings.outsideDeliveryCharge ?? 130
+    checkoutSettings.outsideDeliveryCharge ?? DEFAULT_OUTSIDE_CHARGE
   );
 
   const freeDeliveryAbove = Number(
-    checkoutSettings.freeDeliveryAbove ?? 2000
+    checkoutSettings.freeDeliveryAbove ?? DEFAULT_FREE_ABOVE
   );
 
   const codEnabled = checkoutSettings.codEnabled !== false;

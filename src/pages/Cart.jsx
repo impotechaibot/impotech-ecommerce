@@ -2,14 +2,16 @@ import { Link } from 'react-router-dom';
 import { Minus, Plus, Trash2, ShoppingBag, ArrowRight } from 'lucide-react';
 import { useStore } from '../context/StoreContext.jsx';
 import { money, toBn } from '../lib/format.js';
+import { calcShipping, amountToFreeDelivery } from '../lib/delivery.js';
 import Seo from '../components/Seo.jsx';
 
 export default function Cart() {
   const { cart, updateQty, removeFromCart, cartSubtotal, settings } = useStore();
   const checkout = settings?.checkout || {};
-  const freeAbove = Number(checkout.freeDeliveryAbove || 0);
-  const shipping = cartSubtotal >= freeAbove && freeAbove > 0 ? 0 : Number(checkout.deliveryCharge || 0);
-  const total = cartSubtotal + (cart.length ? shipping : 0);
+  // চার্জের হিসাব এক জায়গায় (lib/delivery.js) — অ্যাডমিন থেকে নিয়ন্ত্রিত
+  const shipping = cart.length ? calcShipping(cartSubtotal, checkout) : 0;
+  const freeLeft = amountToFreeDelivery(cartSubtotal, checkout);
+  const total = cartSubtotal + shipping;
 
   if (cart.length === 0) {
     return (

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
+import { calcShipping, deliverySettings } from "../lib/delivery.js";
 
 const initialForm = {
   customer_name: "",
@@ -70,17 +71,8 @@ export default function Checkout() {
   const checkoutSettings = settings?.checkout || {};
 
   // ডিফল্ট মান এক জায়গা থেকেই আসে (lib/delivery.js)
-  const deliveryInside = Number(
-    checkoutSettings.deliveryCharge ?? DEFAULT_DELIVERY_CHARGE
-  );
-
-  const deliveryOutside = Number(
-    checkoutSettings.outsideDeliveryCharge ?? DEFAULT_OUTSIDE_CHARGE
-  );
-
-  const freeDeliveryAbove = Number(
-    checkoutSettings.freeDeliveryAbove ?? DEFAULT_FREE_ABOVE
-  );
+  const { inside: deliveryInside, outside: deliveryOutside } =
+    deliverySettings(checkoutSettings);
 
   const codEnabled = checkoutSettings.codEnabled !== false;
 
@@ -94,21 +86,14 @@ export default function Checkout() {
     }, 0);
   }, [cart]);
 
-  // Shipping calculation
-  const regularShipping =
-    deliveryZone === "outside"
-      ? deliveryOutside
-      : deliveryInside;
-
-  const isFreeDelivery =
-    freeDeliveryAbove > 0 &&
-    subtotal >= freeDeliveryAbove;
-
+  // Shipping calculation — এক জায়গার হিসাব (lib/delivery.js)
   const shipping = cart.length
-    ? isFreeDelivery
-      ? 0
-      : regularShipping
+    ? calcShipping(subtotal, checkoutSettings, {
+        outside: deliveryZone === "outside",
+      })
     : 0;
+
+  const isFreeDelivery = cart.length > 0 && shipping === 0;
 
   const discount = 0;
   const total = subtotal + shipping - discount;

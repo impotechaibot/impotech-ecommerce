@@ -89,9 +89,9 @@ export default function Cart() {
               <span className="text-ink-muted">ডেলিভারি চার্জ</span>
               <span>{shipping === 0 ? <span className="text-emerald-400">ফ্রি</span> : money(shipping)}</span>
             </div>
-            {freeAbove > 0 && cartSubtotal < freeAbove && (
+            {freeLeft > 0 && (
               <p className="text-xs text-ink-muted bg-surface2 rounded-field p-2.5">
-                আরও {money(freeAbove - cartSubtotal)} কিনলে ফ্রি ডেলিভারি!
+                আরও {money(freeLeft)} কিনলে ফ্রি ডেলিভারি!
               </p>
             )}
             <div className="border-t border-line pt-3 flex justify-between text-base font-semibold">

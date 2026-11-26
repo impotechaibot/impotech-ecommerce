@@ -1,22 +1,273 @@
-// ============================================================
-// ফাইল: src/hooks/useSiteConfig.js
-// কাজ: শুধু fetchRemoteSiteConfig ফাংশনটা বদলান। বাকি কিছু ছোঁবেন না।
-//
-// কীভাবে বদলাবেন:
-// ১. ফাইলে এই লাইনটা খুঁজুন:
-//      /** Supabase থেকে সেটিংস পড়ে। না পেলে / ফেল করলে null। */
-// ২. ওই লাইন থেকে শুরু করে ফাংশনের শেষের `};` পর্যন্ত
-//    (যেটা "/** সেটিংস Supabase-এ লেখে" লাইনের ঠিক আগে) সব মুছুন।
-// ৩. মোছা জায়গায় নিচের কোডটা বসান।
-// ============================================================
+import { useCallback, useEffect, useState } from 'react';
+import {
+  STORE_INFO,
+  slides as DEFAULT_SLIDES,
+  banners as DEFAULT_BANNERS,
+  services as DEFAULT_SERVICES,
+  footerLinks as DEFAULT_FOOTER_LINKS,
+} from '../productsStore/Store.js';
+import { DEFAULT_LAYOUT } from '../lib/layout.js';
+import { supabase, isSupabaseConfigured } from '../lib/supabase.js';
+
+/* ==========================================================
+   useSiteConfig — the single source of truth for everything the
+   admin panel can change about the site itself (not products).
+
+   দুটি স্তরে সংরক্ষণ:
+     ১. localStorage['impotech_site']  — তাৎক্ষণিক, অফলাইনেও কাজ করে
+     ২. Supabase টেবিল site_settings   — সব ডিভাইসে এক থাকে
+
+   Supabase কনফিগার না থাকলে বা নেটওয়ার্ক ফেল করলে সাইট কখনো
+   ভাঙবে না — শুধু localStorage দিয়েই চলবে।
+   ========================================================== */
+
+export const SITE_KEY = 'impotech_site';
+export const SITE_EVENT = 'impotech-site-change';
+export const SITE_TABLE = 'site_settings';
+export const SITE_ROW_KEY = 'site';
+
+export const DEFAULT_NAV = [
+  { id: 'n1', label: 'হোম', to: '/', end: true },
+  { id: 'n2', label: 'ফ্ল্যাশ সেল', to: '/products?sort=flash', hot: true },
+  { id: 'n3', label: 'সব পণ্য', to: '/products' },
+  { id: 'n4', label: 'রাইডিং গিয়ার', to: '/products?category=riding-gear' },
+  { id: 'n5', label: 'অর্ডার ট্র্যাকিং', to: '/track' },
+];
+
+export const DEFAULT_CONTENT = {
+  about: {
+    title: 'আমাদের সম্পর্কে',
+    body:
+      'ইম্পোটেক — চায়না থেকে সরাসরি আমদানি করা প্রিমিয়াম বাইক অ্যাকসেসরিজের বিশ্বস্ত ঠিকানা।\n\n' +
+      'আমরা ২০২০ সাল থেকে বাংলাদেশের রাইডারদের জন্য মানসম্মত LED লাইট, রাইডিং গিয়ার ও বাইক অ্যাকসেসরিজ সরবরাহ করে আসছি। ' +
+      'প্রতিটি পণ্য নিজে হাতে যাচাই করে তারপর তালিকায় যোগ করা হয়, যাতে আপনি পান অরিজিনাল কোয়ালিটি নিশ্চিন্তে।\n\n' +
+      'আমাদের লক্ষ্য একটাই — সাশ্রয়ী দামে সেরা মানের পণ্য, দ্রুত ডেলিভারি আর আন্তরিক কাস্টমার সাপোর্ট।',
+  },
+  privacy: {
+    title: 'প্রাইভেসি পলিসি',
+    body:
+      'আপনার ব্যক্তিগত তথ্যের গোপনীয়তা আমাদের কাছে সর্বোচ্চ গুরুত্বপূর্ণ।\n\n' +
+      '১. আমরা শুধু অর্ডার প্রক্রিয়াকরণের জন্য প্রয়োজনীয় তথ্য (নাম, মোবাইল নম্বর, ঠিকানা) সংগ্রহ করি।\n' +
+      '২. আপনার তথ্য কোনো তৃতীয় পক্ষের কাছে বিক্রি বা শেয়ার করা হয় না — ডেলিভারি পার্টনার ছাড়া, এবং শুধু ডেলিভারির প্রয়োজন।\n' +
+      '৩. পেমেন্ট তথ্য আমাদের সার্ভারে সংরক্ষণ করা হয় না; পেমেন্ট গেটওয়ে সরাসরি প্রক্রিয়া করে।\n' +
+      '৪. আপনি যেকোনো সময় আপনার তথ্য মুছে ফেলার অনুরোধ করতে পারেন।',
+  },
+  terms: {
+    title: 'শর্তাবলী',
+    body:
+      'এই ওয়েবসাইট ব্যবহার করে অর্ডার করার মাধ্যমে আপনি নিচের শর্তাবলীতে সম্মত হচ্ছেন।\n\n' +
+      '১. পণ্যের দাম ও স্টক যেকোনো সময় পরিবর্তন হতে পারে; অর্ডার কনফার্ম হওয়ার সময়ের দামই চূড়ান্ত।\n' +
+      '২. ভুল দাম বা স্টক তথ্যের কারণে অর্ডার বাতিলের অধিকার আমরা সংরক্ষণ করি — সেক্ষেত্রে সম্পূর্ণ টাকা ফেরত দেওয়া হবে।\n' +
+      '৩. পণ্যের ছবি ও বর্ণনা যতটা সম্ভব নির্ভুল রাখা হয়; তবে স্ক্রিনের রঙে সামান্য পার্থক্য হতে পারে।\n' +
+      '৪. অপব্যবহার বা ভুয়া অর্ডার শনাক্ত হলে অ্যাকাউন্ট ব্লক করা হতে পারে।',
+  },
+  returns: {
+    title: 'রিটার্ন পলিসি',
+    body:
+      'পণ্য হাতে পাওয়ার ৭ দিনের মধ্যে রিটার্ন বা রিপ্লেসমেন্টের সুযোগ আছে।\n\n' +
+      'শর্ত:\n' +
+      '• পণ্য অব্যবহৃত ও অরিজিনাল প্যাকেজিংয়ে থাকতে হবে।\n' +
+      '• ভাঙা, ত্রুটিপূর্ণ বা ভুল পণ্য এলো ডেলিভারি চার্জ আমাদের বহন করবে।\n' +
+      '• পছন্দ না হলে ডেলিভারি চার্জ ক্রেতাকে বহন করতে হবে।\n' +
+      '• রিটার্নের জন্য অর্ডার আইডি ও পণ্যের ছবি সহ আমাদের হটলাইনে যোগাযোগ করুন।\n\n' +
+      'রিফান্ড সাধারণত ৩–৭ কর্মদিবসের মধ্যে প্রক্রিয়া করা হয়।',
+  },
+  faq: {
+    title: 'সাধারণ প্রশ্নোত্তর',
+    body:
+      'প্রশ্ন: ডেলিভারিতে কত সময় লাগে?\n' +
+      'উত্তর: ঢাকার ভিতরে ২৪ ঘণ্টা, ঢাকার বাইরে ২–৪ কর্মদিবস।\n\n' +
+      'প্রশ্ন: ক্যাশ অন ডেলিভারি আছে কি?\n' +
+      'উত্তর: হ্যাঁ, সারা বাংলাদেশে ক্যাশ অন ডেলিভারি সুবিধা আছে।\n\n' +
+      'প্রশ্ন: পণ্য অরিজিনাল কি?\n' +
+      'উত্তর: হ্যাঁ, প্রতিটি পণ্য নিজে যাচাই করে তালিকায় যোগ করা হয় এবং ৭ দিনের রিপ্লেসমেন্ট গ্যারান্টি দেওয়া হয়।\n\n' +
+      'প্রশ্ন: অর্ডার ট্র্যাক করব কীভাবে?\n' +
+      'উত্তর: অর্ডার কনফার্ম হলে যে আইডি পাবেন, সেটি "অর্ডার ট্র্যাকিং" পেজে দিলেই স্ট্যাটাস দেখতে পাবেন।',
+  },
+};
+
+export const DEFAULT_SEO = {
+  home: {
+    title: 'ইম্পোটেক — প্রিমিয়াম বাইক অ্যাকসেসরিজ',
+    description:
+      'চায়না থেকে সরাসরি আমদানি করা প্রিমিয়াম বাইক অ্যাকসেসরিজ। LED অ্যাঞ্জেল উইংস, রাইডিং গিয়ার ও আরও অনেক কিছু।',
+  },
+  products: {
+    title: 'সব পণ্য — ইম্পোটেক',
+    description: 'ইম্পোটেকের সম্পূর্ণ পণ্য তালিকা — LED লাইট, রাইডিং গিয়ার, বাইক অ্যাকসেসরিজ।',
+  },
+  product: {
+    title: 'পণ্যের বিস্তারিত — ইম্পোটেক',
+    description: 'পণ্যের বিস্তারিত তথ্য, দাম ও স্টক দেখুন।',
+  },
+  cart: { title: 'শপিং কার্ট — ইম্পোটেক', description: 'আপনার কার্টের পণ্য দেখুন ও অর্ডার সম্পন্ন করুন।' },
+  checkout: { title: 'চেকআউট — ইম্পোটেক', description: 'ডেলিভারি তথ্য দিয়ে অর্ডার কনফার্ম করুন।' },
+  track: { title: 'অর্ডার ট্র্যাকিং — ইম্পোটেক', description: 'অর্ডার আইডি দিয়ে ডেলিভারি স্ট্যাটাস দেখুন।' },
+  search: { title: 'সার্চ — ইম্পোটেক', description: 'পছন্দের পণ্য খুঁজুন।' },
+  wishlist: { title: 'উইশলিস্ট — ইম্পোটেক', description: 'আপনার সেভ করা পণ্য।' },
+  about: { title: 'আমাদের সম্পর্কে — ইম্পোটেক', description: 'ইম্পোটেক সম্পর্কে জানুন।' },
+  privacy: { title: 'প্রাইভেসি পলিসি — ইম্পোটেক', description: 'আমাদের প্রাইভেসি পলিসি।' },
+  terms: { title: 'শর্তাবলী — ইম্পোটেক', description: 'সেবা ব্যবহারের শর্তাবলী।' },
+  returns: { title: 'রিটার্ন পলিসি — ইম্পোটেক', description: 'রিটার্ন ও রিপ্লেসমেন্ট নীতিমালা।' },
+  faq: { title: 'সাধারণ প্রশ্নোত্তর — ইম্পোটেক', description: 'সাধারণ প্রশ্নের উত্তর।' },
+};
+
+export const DEFAULT_SITE = {
+  /* ---- identity ---- */
+  siteName: STORE_INFO.name,
+  siteNameEn: STORE_INFO.nameEn,
+  tagline: 'চায়না থেকে সরাসরি আমদানি — প্রিমিয়াম বাইক অ্যাকসেসরিজ',
+  logo: '',
+  favicon: '',
+  copyright: '© {year} ইম্পোটেক — সর্বস্বত্ব সংরক্ষিত।',
+
+  /* ---- theme ---- */
+  theme: {
+    accent: '#f0b429',
+    accentDark: '#c9920f',
+    fontScale: 100,
+    radius: 18,
+    mode: 'dark',
+  },
+
+  /* ---- product page layout ---- */
+  layout: DEFAULT_LAYOUT,
+
+  /* ---- navigation ---- */
+  nav: DEFAULT_NAV,
+
+  /* ---- contact ---- */
+  contact: {
+    phone: STORE_INFO.phone,
+    email: 'support@impotech.com.bd',
+    address: STORE_INFO.address,
+    hours: STORE_INFO.hours,
+    whatsapp: STORE_INFO.phone,
+    facebook: 'https://www.facebook.com/',
+    instagram: 'https://www.instagram.com/',
+    youtube: 'https://www.youtube.com/',
+    tiktok: '',
+  },
+
+  /* ---- checkout / payment ---- */
+  checkout: {
+    deliveryCharge: 100,
+    outsideDeliveryCharge: 130,
+    freeDeliveryAbove: 2000,
+    codEnabled: true,
+    bkashEnabled: true,
+    bkashNumber: '01884332067',
+    nagadEnabled: true,
+    nagadNumber: '01884332067',
+    rocketEnabled: false,
+    rocketNumber: '',
+    paymentNote:
+      'বিকাশ/নগদে টাকা পাঠিয়ে ট্রানজেকশন আইডি অর্ডার নোটে লিখুন। পেমেন্ট ভেরিফাই হলে অর্ডার প্রসেস শুরু হবে।',
+    confirmMessage:
+      'ধন্যবাদ! আপনার অর্ডারটি আমরা পেয়েছি। শীঘ্রই আমাদের প্রতিনিধি আপনার সাথে যোগাযোগ করবেন।',
+  },
+
+  /* ---- home page ---- */
+  home: {
+    slides: DEFAULT_SLIDES,
+    banners: DEFAULT_BANNERS,
+    services: DEFAULT_SERVICES,
+    newsletter: {
+      title: 'নিউজলেটার সাবস্ক্রাইব করুন',
+      text: 'সর্বশেষ অফার ও নতুন পণ্য সম্পর্কে জানতে আপনার ইমেইল দিন।',
+      button: 'সাবস্ক্রাইব',
+    },
+  },
+
+  /* ---- footer ---- */
+  footerLinks: DEFAULT_FOOTER_LINKS,
+
+  /* ---- content pages ---- */
+  content: DEFAULT_CONTENT,
+
+  /* ---- seo ---- */
+  seo: DEFAULT_SEO,
+  ogImage: '',
+
+  /* ---- admin ---- */
+  admin: {
+    password: 'impotech2026',
+  },
+};
+
+/* Deep-merge the stored blob over the defaults so a config saved by an
+   older version (missing a key) still works after an upgrade. */
+const mergeDeep = (base, patch) => {
+  if (Array.isArray(base) || Array.isArray(patch)) {
+    return Array.isArray(patch) ? patch : base;
+  }
+  if (typeof base !== 'object' || base === null) return patch ?? base;
+  if (typeof patch !== 'object' || patch === null) return base;
+  const out = { ...base };
+  Object.keys(patch).forEach((k) => {
+    out[k] = k in base ? mergeDeep(base[k], patch[k]) : patch[k];
+  });
+  return out;
+};
+
+export const readSiteConfig = () => {
+  try {
+    const raw = localStorage.getItem(SITE_KEY);
+    if (!raw) return DEFAULT_SITE;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return DEFAULT_SITE;
+    return mergeDeep(DEFAULT_SITE, parsed);
+  } catch {
+    return DEFAULT_SITE;
+  }
+};
+
+export const hasCustomSite = () => {
+  try {
+    return Boolean(localStorage.getItem(SITE_KEY));
+  } catch {
+    return false;
+  }
+};
+
+/** Returns true when the write landed (localStorage can be full). */
+export const writeSiteConfig = (cfg) => {
+  try {
+    localStorage.setItem(SITE_KEY, JSON.stringify(cfg));
+    window.dispatchEvent(new CustomEvent(SITE_EVENT, { detail: cfg }));
+    return true;
+  } catch (err) {
+    console.warn('Site config could not be saved', err);
+    return false;
+  }
+};
+
+export const clearSiteConfig = () => {
+  try {
+    localStorage.removeItem(SITE_KEY);
+    window.dispatchEvent(new CustomEvent(SITE_EVENT, { detail: DEFAULT_SITE }));
+  } catch (err) {
+    console.warn('Site config could not be reset', err);
+  }
+};
+
+/* ==========================================================
+   Supabase সিঙ্ক
+   ----------------------------------------------------------
+   টেবিল: site_settings  (key text primary key, value jsonb)
+
+   সেটিংস দুই ভাবে থাকতে পারে:
+     ক) আলাদা সারি: checkout, theme, contact, identity
+     খ) একটি বড় সারি: key = 'site'
+
+   ⚠️ গঠনটা StoreContext.jsx-এর সাথে মিলিয়ে নেওয়া হয়েছে —
+   সেটাও map[row.key] = row.value করে পড়ে।
+   ========================================================== */
 
 /** Supabase থেকে সেটিংস পড়ে। না পেলে / ফেল করলে null।
  *
- *  site_settings টেবিলে সেটিংস দুই ভাবে থাকতে পারে:
- *   ক) আলাদা সারি: checkout, theme, contact, identity
- *   খ) একটি বড় সারি: key = 'site'
- *  এখন দুটোই পড়া হয়। অগ্রাধিকার (কম → বেশি):
- *   ডিফল্ট  <  আলাদা সারি  <  'site' সারি (খালি না হলে)
+ *  আলাদা সারি (checkout, theme, contact, identity) এবং 'site' সারি — দুটোই পড়া হয়।
+ *  অগ্রাধিকার (কম → বেশি): ডিফল্ট < আলাদা সারি < 'site' সারি (খালি না হলে)
  */
 export const fetchRemoteSiteConfig = async () => {
   if (!isSupabaseConfigured || !supabase) return null;
@@ -34,24 +285,176 @@ export const fetchRemoteSiteConfig = async () => {
       if (r && isObj(r.value)) rows[r.key] = r.value;
     });
 
-    // আলাদা সারিগুলো থেকে একটি প্যাচ বানাই
+    /* আলাদা সারিগুলো থেকে একটি প্যাচ বানাই.
+       identity-র ফিল্ডগুলো (siteName, logo, tagline ...) কনফিগে উপরের স্তরে থাকে */
     const fromRows = {};
-    // identity-র ফিল্ডগুলো (siteName, logo, tagline ...) কনফিগে সরাসরি উপরের স্তরে থাকে
     if (isObj(rows.identity)) Object.assign(fromRows, rows.identity);
     ['checkout', 'theme', 'contact'].forEach((k) => {
       if (isObj(rows[k])) fromRows[k] = rows[k];
     });
 
     const hasRows = Object.keys(fromRows).length > 0;
-    const hasSite = isObj(rows.site) && Object.keys(rows.site).length > 0;
+    const hasSite = isObj(rows[SITE_ROW_KEY]) && Object.keys(rows[SITE_ROW_KEY]).length > 0;
 
     /* কিছুই না থাকলে রিমোট নেই ধরে নাও — নাহলে লোকাল সেটিং মুছে যেত */
     if (!hasRows && !hasSite) return null;
 
     const merged = mergeDeep(DEFAULT_SITE, fromRows);
-    return hasSite ? mergeDeep(merged, rows.site) : merged;
+    return hasSite ? mergeDeep(merged, rows[SITE_ROW_KEY]) : merged;
   } catch (err) {
     console.warn('[site] Supabase থেকে পড়া যায়নি — localStorage ব্যবহার হচ্ছে', err);
     return null;
   }
+};
+
+/** সেটিংস Supabase-এ লেখে। { ok, reason?, message? } ফেরত দেয়। */
+export const pushRemoteSiteConfig = async (cfg) => {
+  if (!isSupabaseConfigured || !supabase) {
+    return { ok: false, reason: 'not-configured' };
+  }
+  try {
+    const { error } = await supabase
+      .from(SITE_TABLE)
+      .upsert(
+        { key: SITE_ROW_KEY, value: cfg, updated_at: new Date().toISOString() },
+        { onConflict: 'key' }
+      );
+    if (error) throw error;
+    return { ok: true };
+  } catch (err) {
+    console.warn('[site] Supabase-এ লেখা যায়নি', err);
+    return { ok: false, reason: 'network', message: err?.message || String(err) };
+  }
+};
+
+/* এক পেজ-লোডে একবারই রিমোট পড়া হয় (সব কম্পোনেন্ট একসাথে ফেচ করবে না) */
+let remoteLoaded = false;
+
+export const useSiteConfig = () => {
+  const [config, setConfig] = useState(readSiteConfig);
+  const [remoteStatus, setRemoteStatus] = useState(
+    isSupabaseConfigured ? 'loading' : 'disabled'
+  );
+
+  useEffect(() => {
+    const sync = (e) => setConfig(e.detail || readSiteConfig());
+    const onStorage = (e) => {
+      if (e.key === SITE_KEY) setConfig(readSiteConfig());
+    };
+    window.addEventListener(SITE_EVENT, sync);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener(SITE_EVENT, sync);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
+
+  /* ---------- লোডে Supabase থেকে পড়া ---------- */
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setRemoteStatus('disabled');
+      return undefined;
+    }
+    if (remoteLoaded) {
+      setRemoteStatus('synced');
+      return undefined;
+    }
+    let alive = true;
+    (async () => {
+      const remote = await fetchRemoteSiteConfig();
+      if (!alive) return;
+      remoteLoaded = true;
+      if (remote) {
+        writeSiteConfig(remote);
+        setConfig(remote);
+        setRemoteStatus('synced');
+      } else {
+        setRemoteStatus('offline');
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  /** save(patch) merges a partial update; save(fn) gets the current config.
+   *
+   *  ⚠️ আগের বাগ: এখানে শুধু localStorage-এ লেখা হত, তাই অ্যাডমিনের
+   *  সব সেটিং (ডেলিভারি চার্জ, থিম, কনটেন্ট) লাইভ সাইটে কখনো যেত না।
+   *  এখন localStorage-এ সাথে সাথে লেখে **এবং** Supabase-এ push করে।
+   *  sync boolean ফেরত দেয় (localStorage সফল হয়েছে কি না) — পুরনো
+   *  কলাররা ভাঙে না; রিমোট স্টেটাস `remoteStatus`-এ পাওয়া যায়।
+   */
+  const save = useCallback((patch) => {
+    const current = readSiteConfig();
+    const next =
+      typeof patch === 'function' ? patch(current) : mergeDeep(current, patch);
+    const ok = writeSiteConfig(next);
+    if (ok) setConfig(next);
+
+    // রিমোটে পাঠানো (fire-and-forget — UI ব্লক হয় না)
+    if (isSupabaseConfigured) {
+      setRemoteStatus('saving');
+      pushRemoteSiteConfig(next).then((res) => {
+        if (res.ok) setRemoteStatus('synced');
+        else if (res.reason === 'not-configured') setRemoteStatus('disabled');
+        else setRemoteStatus('offline');
+      });
+    }
+
+    return ok;
+  }, []);
+
+  /** বর্তমান সেটিংস Supabase-এ পাঠায় (async)। */
+  const syncRemote = useCallback(async () => {
+    const current = readSiteConfig();
+    const res = await pushRemoteSiteConfig(current);
+    if (res.ok) setRemoteStatus('synced');
+    else if (res.reason === 'not-configured') setRemoteStatus('disabled');
+    else setRemoteStatus('offline');
+    return res;
+  }, []);
+
+  const reset = useCallback(() => {
+    clearSiteConfig();
+    setConfig(DEFAULT_SITE);
+  }, []);
+
+  return { config, save, reset, syncRemote, remoteStatus, defaults: DEFAULT_SITE };
+};
+
+/* ---------- small helpers used across the app ---------- */
+
+/** '#f0b429' → '240, 180, 41' (for rgba() shadows / soft tints). */
+export const hexToRgb = (hex) => {
+  const clean = String(hex || '').replace('#', '');
+  const full =
+    clean.length === 3
+      ? clean
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : clean;
+  const n = parseInt(full || 'f0b429', 16);
+  if (Number.isNaN(n)) return '240, 180, 41';
+  return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
+};
+
+/** Slightly darker variant of a hex colour (used for hover states). */
+export const darken = (hex, amount = 0.18) => {
+  const clean = String(hex || '').replace('#', '');
+  const full =
+    clean.length === 3
+      ? clean
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : clean;
+  const n = parseInt(full || 'f0b429', 16);
+  if (Number.isNaN(n)) return hex;
+  const clamp = (v) => Math.max(0, Math.min(255, Math.round(v)));
+  const r = clamp(((n >> 16) & 255) * (1 - amount));
+  const g = clamp(((n >> 8) & 255) * (1 - amount));
+  const b = clamp((n & 255) * (1 - amount));
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
 };

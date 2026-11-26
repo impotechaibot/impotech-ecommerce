@@ -256,19 +256,24 @@ export const clearSiteConfig = () => {
    ----------------------------------------------------------
    টেবিল: site_settings  (key text primary key, value jsonb)
 
-   সেটিংস দুই ভাবে থাকতে পারে:
-     ক) আলাদা সারি: checkout, theme, contact, identity
-     খ) একটি বড় সারি: key = 'site'
+   কনফিগ ডেটাবেসে কয়েকটি সারিতে ভাগ হয়ে থাকে:
+     checkout   → ডেলিভারি চার্জ, পেমেন্ট, কনফার্মেশন মেসেজ
+     theme      → রং, ফন্ট, কোণা, মোড
+     contact    → ফোন, ইমেইল, ঠিকানা, সোশ্যাল লিংক
+     identity   → সাইটের নাম, লোগো, ট্যাগলাইন, ফেভিকন, কপিরাইট
+     site       → বাকি সব (হোম, মেনু, কনটেন্ট, SEO, লেআউট, ফুটার ...)
 
-   ⚠️ গঠনটা StoreContext.jsx-এর সাথে মিলিয়ে নেওয়া হয়েছে —
-   সেটাও map[row.key] = row.value করে পড়ে।
+   এই সারিগুলোই StoreContext / Checkout / Header পড়ে — তাই অ্যাডমিন
+   থেকে সেভ করলে চেকআউট ও হেডারেও পরিবর্তন পৌঁছায়।
+
+   🔒 অ্যাডমিন পাসওয়ার্ড (config.admin) কখনো ডেটাবেসে পাঠানো হয় না।
    ========================================================== */
 
-/** Supabase থেকে সেটিংস পড়ে। না পেলে / ফেল করলে null।
- *
- *  আলাদা সারি (checkout, theme, contact, identity) এবং 'site' সারি — দুটোই পড়া হয়।
- *  অগ্রাধিকার (কম → বেশি): ডিফল্ট < আলাদা সারি < 'site' সারি (খালি না হলে)
- */
+const IDENTITY_KEYS = ['siteName', 'siteNameEn', 'tagline', 'logo', 'favicon', 'copyright'];
+const SECTION_KEYS = ['checkout', 'theme', 'contact'];
+const isObj = (v) => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
+
+/** Supabase থেকে সেটিংস পড়ে। না পেলে / ফেল করলে null। */
 export const fetchRemoteSiteConfig = async () => {
   if (!isSupabaseConfigured || !supabase) return null;
   try {
@@ -278,29 +283,31 @@ export const fetchRemoteSiteConfig = async () => {
     if (error) throw error;
     if (!Array.isArray(data) || data.length === 0) return null;
 
-    const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
-
     const rows = {};
     data.forEach((r) => {
       if (r && isObj(r.value)) rows[r.key] = r.value;
     });
 
-    /* আলাদা সারিগুলো থেকে একটি প্যাচ বানাই.
-       identity-র ফিল্ডগুলো (siteName, logo, tagline ...) কনফিগে উপরের স্তরে থাকে */
-    const fromRows = {};
-    if (isObj(rows.identity)) Object.assign(fromRows, rows.identity);
-    ['checkout', 'theme', 'contact'].forEach((k) => {
-      if (isObj(rows[k])) fromRows[k] = rows[k];
+    /* 'site' সারি থেকে শুধু "বাকি" অংশ নেওয়া হয়। যে অংশের নিজস্ব সারি আছে
+       (checkout/theme/contact/identity), সেখানে নিজস্ব সারিই চূড়ান্ত।
+       পাসওয়ার্ড (admin) কখনো ডেটাবেস থেকে নেওয়া হয় না। */
+    const patch = isObj(rows[SITE_ROW_KEY]) ? { ...rows[SITE_ROW_KEY] } : {};
+    delete patch.admin;
+
+    SECTION_KEYS.forEach((k) => {
+      if (isObj(rows[k])) patch[k] = rows[k];
     });
 
-    const hasRows = Object.keys(fromRows).length > 0;
-    const hasSite = isObj(rows[SITE_ROW_KEY]) && Object.keys(rows[SITE_ROW_KEY]).length > 0;
+    if (isObj(rows.identity)) {
+      IDENTITY_KEYS.forEach((k) => {
+        if (k in rows.identity) patch[k] = rows.identity[k];
+      });
+    }
 
     /* কিছুই না থাকলে রিমোট নেই ধরে নাও — নাহলে লোকাল সেটিং মুছে যেত */
-    if (!hasRows && !hasSite) return null;
+    if (Object.keys(patch).length === 0) return null;
 
-    const merged = mergeDeep(DEFAULT_SITE, fromRows);
-    return hasSite ? mergeDeep(merged, rows[SITE_ROW_KEY]) : merged;
+    return mergeDeep(DEFAULT_SITE, patch);
   } catch (err) {
     console.warn('[site] Supabase থেকে পড়া যায়নি — localStorage ব্যবহার হচ্ছে', err);
     return null;
@@ -313,13 +320,47 @@ export const pushRemoteSiteConfig = async (cfg) => {
     return { ok: false, reason: 'not-configured' };
   }
   try {
+    const now = new Date().toISOString();
+
+    // বাকি অংশ থেকে একে একে আলাদা সারির অংশ সরিয়ে নিই
+    const rest = { ...cfg };
+    delete rest.admin; // 🔒 পাসওয়ার্ড কখনো পাঠানো হয় না
+
+    const identity = {};
+    IDENTITY_KEYS.forEach((k) => {
+      identity[k] = rest[k] ?? '';
+      delete rest[k];
+    });
+
+    const rows = [];
+    SECTION_KEYS.forEach((k) => {
+      if (isObj(rest[k])) rows.push({ key: k, value: rest[k], updated_at: now });
+      delete rest[k];
+    });
+    rows.push({ key: 'identity', value: identity, updated_at: now });
+    rows.push({ key: SITE_ROW_KEY, value: rest, updated_at: now });
+
     const { error } = await supabase
       .from(SITE_TABLE)
-      .upsert(
-        { key: SITE_ROW_KEY, value: cfg, updated_at: new Date().toISOString() },
-        { onConflict: 'key' }
-      );
-    if (error) throw error;
+      .upsert(rows, { onConflict: 'key' });
+
+    if (error) {
+      /* ফলব্যাক: upsert কাজ না করলে (যেমন কনস্ট্রেইন্ট না থাকলে)
+         প্রতিটি সারি আলাদা করে update, না থাকলে insert */
+      console.warn('[site] upsert ব্যর্থ, সারি ধরে ধরে চেষ্টা হচ্ছে', error);
+      for (const row of rows) {
+        const { data: updated, error: updateError } = await supabase
+          .from(SITE_TABLE)
+          .update({ value: row.value, updated_at: row.updated_at })
+          .eq('key', row.key)
+          .select('key');
+        if (updateError) throw updateError;
+        if (!updated || updated.length === 0) {
+          const { error: insertError } = await supabase.from(SITE_TABLE).insert(row);
+          if (insertError) throw insertError;
+        }
+      }
+    }
     return { ok: true };
   } catch (err) {
     console.warn('[site] Supabase-এ লেখা যায়নি', err);
@@ -365,8 +406,10 @@ export const useSiteConfig = () => {
       if (!alive) return;
       remoteLoaded = true;
       if (remote) {
-        writeSiteConfig(remote);
-        setConfig(remote);
+        // পাসওয়ার্ড ডেটাবেস থেকে আসে না — লোকাল মানটাই রেখে দিই
+        const next = { ...remote, admin: readSiteConfig().admin };
+        writeSiteConfig(next);
+        setConfig(next);
         setRemoteStatus('synced');
       } else {
         setRemoteStatus('offline');
@@ -379,11 +422,10 @@ export const useSiteConfig = () => {
 
   /** save(patch) merges a partial update; save(fn) gets the current config.
    *
-   *  ⚠️ আগের বাগ: এখানে শুধু localStorage-এ লেখা হত, তাই অ্যাডমিনের
-   *  সব সেটিং (ডেলিভারি চার্জ, থিম, কনটেন্ট) লাইভ সাইটে কখনো যেত না।
-   *  এখন localStorage-এ সাথে সাথে লেখে **এবং** Supabase-এ push করে।
-   *  sync boolean ফেরত দেয় (localStorage সফল হয়েছে কি না) — পুরনো
-   *  কলাররা ভাঙে না; রিমোট স্টেটাস `remoteStatus`-এ পাওয়া যায়।
+   *  localStorage-এ সাথে সাথে লেখে **এবং** Supabase-এ push করে (আলাদা সারিতে
+   *  ভাগ করে — উপরের মন্তব্য দেখুন)। sync boolean ফেরত দেয় (localStorage
+   *  সফল হয়েছে কি না) — পুরনো কলাররা ভাঙে না; রিমোট স্টেটাস
+   *  `remoteStatus`-এ পাওয়া যায়।
    */
   const save = useCallback((patch) => {
     const current = readSiteConfig();

@@ -37,7 +37,7 @@ const EMPTY_SLIDE = {
   title: '',
   subtitle: '',
   cta: 'এখনই কিনুন',
-  link: '/products',
+  link: '/shop',
 };
 
 const EMPTY_BANNER = { id: '', image: '', title: '', subtitle: '', link: '/products' };

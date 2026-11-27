@@ -3,7 +3,7 @@
  */
 
 /** ডকুমেন্ট টাইটেল ও মেটা সেট */
-export function setMeta({ title, description, image, url, type = 'website' }) {
+export function setMeta({ title, description, image, url, type = 'website', robots = 'index,follow', twitterHandle = '', facebookAppId = '' }) {
   if (title) document.title = title;
 
   const setTag = (attr, key, content) => {
@@ -18,12 +18,20 @@ export function setMeta({ title, description, image, url, type = 'website' }) {
   };
 
   setTag('name', 'description', description);
+  setTag('name', 'robots', robots);
   setTag('property', 'og:title', title);
   setTag('property', 'og:description', description);
   setTag('property', 'og:type', type);
   if (image) setTag('property', 'og:image', image);
-  if (url) setTag('property', 'og:url', url);
+  if (url) {
+    setTag('property', 'og:url', url);
+    let canonical = document.head.querySelector('link[rel=\"canonical\"]');
+    if (!canonical) { canonical = document.createElement('link'); canonical.rel = 'canonical'; document.head.appendChild(canonical); }
+    canonical.href = url;
+  }
   setTag('name', 'twitter:card', 'summary_large_image');
+  if (twitterHandle) setTag('name', 'twitter:site', twitterHandle);
+  if (facebookAppId) setTag('property', 'fb:app_id', facebookAppId);
   setTag('name', 'twitter:title', title);
   setTag('name', 'twitter:description', description);
 }

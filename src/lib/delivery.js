@@ -9,7 +9,7 @@
  */
 
 /** অ্যাডমিনে কিছু সেট না থাকলে এই ডিফল্ট। */
-export const DEFAULT_DELIVERY_CHARGE = 100;
+export const DEFAULT_DELIVERY_CHARGE = 80;
 export const DEFAULT_OUTSIDE_CHARGE = 130;
 export const DEFAULT_FREE_ABOVE = 2000;
 

@@ -16,6 +16,8 @@ export const DEFAULT_LAYOUT = {
   descStyle: 'plain',     // plain | card | bullets
   spacing: 'cozy',        // compact | cozy | roomy
   stickyBar: true,
+  showRelated: true,
+  showReviews: true,
 };
 
 export const LAYOUT_GROUPS = [
@@ -88,6 +90,8 @@ export const resolveLayout = (raw) => {
     if (ALLOWED[k].includes(src[k])) out[k] = src[k];
   });
   out.stickyBar = src.stickyBar !== false;
+  out.showRelated = src.showRelated !== false;
+  out.showReviews = src.showReviews !== false;
   return out;
 };
 

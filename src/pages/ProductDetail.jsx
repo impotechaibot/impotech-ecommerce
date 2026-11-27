@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useStore } from '../context/StoreContext.jsx';
+import { useSiteConfig } from '../hooks/useSiteConfig.js';
+import { resolveLayout } from '../lib/layout.js';
 import { localdb } from '../lib/localdb.js';
 import VideoPlayer, { normalizeVideoList } from '../components/VideoPlayer.jsx';
 import { supabase } from '../lib/supabase.js';
@@ -123,6 +125,9 @@ function Stars({ value = 0, size = 14 }) {
 export default function ProductDetail() {
   const { slug } = useParams();
   const navigate = useNavigate();
+  const { config: siteConfig } = useSiteConfig();
+  const layout = resolveLayout(siteConfig?.layout);
+  const ratio = layout.imageRatio === 'wide' ? '4 / 3' : layout.imageRatio === 'tall' ? '3 / 4' : '1 / 1';
 
   const {
     products,
@@ -443,7 +448,7 @@ export default function ProductDetail() {
 
   return (
     <div className="pd-page">
-      <div className="container-x pd-wrap">
+      <div className={`container-x pd-wrap pd-layout-ratio-${layout.imageRatio} pd-layout-title-${layout.titleStyle} pd-layout-price-${layout.priceStyle} pd-layout-buttons-${layout.buttonStyle} pd-layout-desc-${layout.descStyle} pd-layout-space-${layout.spacing}`}>
         <Seo
           title={`${product.name_bn || product.name} — ইম্পোটেক`}
           description={product.description || ''}
@@ -479,7 +484,7 @@ export default function ProductDetail() {
           <div className="pd-grid" style={{ gap: 16 }}>
             {/* ===== গ্যালারি ===== */}
             <div className="pd-gallery">
-              <div className="pd-main-img" style={{ aspectRatio: '1 / 1' }}>
+              <div className="pd-main-img" style={{ aspectRatio: ratio }}>
                 {images.length > 0 ? (
                   <>
                     <img
@@ -562,7 +567,7 @@ export default function ProductDetail() {
                 </p>
               )}
 
-              <h1 className="pd-title" style={{ fontSize: 20, marginTop: 4 }}>
+              <h1 className="pd-title" style={{ fontSize: 20, marginTop: 4, textAlign: layout.titleStyle === 'centered' ? 'center' : 'left' }}>
                 {product.name_bn || product.name}
               </h1>
 
@@ -586,7 +591,7 @@ export default function ProductDetail() {
               </div>
 
               {/* দাম */}
-              <div className="pd-price" style={{ marginTop: 12 }}>
+              <div className={`pd-price pd-price-layout-${layout.priceStyle}`} style={{ marginTop: 12 }}>
                 <div
                   style={{
                     display: 'flex',
@@ -633,11 +638,15 @@ export default function ProductDetail() {
               )}
 
               {/* সংক্ষিপ্ত বর্ণনা */}
-              {product.description && (
-                <p className="pd-desc" style={{ marginTop: 10 }}>
+              {product.description && (layout.descStyle === 'bullets' ? (
+                <ul className="pd-desc pd-desc-layout-bullets" style={{ marginTop: 10 }}>
+                  {String(product.description).split(/\n+/).map((line, index) => line.trim() ? <li key={index}>{line.trim()}</li> : null)}
+                </ul>
+              ) : (
+                <p className={`pd-desc pd-desc-layout-${layout.descStyle}`} style={{ marginTop: 10 }}>
                   {product.description}
                 </p>
-              )}
+              ))}
 
               {/* ভ্যারিয়েন্ট */}
               {colors.length > 0 && (
@@ -686,7 +695,7 @@ export default function ProductDetail() {
 
               {/* কার্ট বাটন */}
               <div
-                className="pd-buy"
+                className={`pd-buy pd-buy-layout-${layout.buttonStyle}`}
                 style={{ display: 'flex', gap: 8, marginTop: 14 }}
               >
                 <button type="button" onClick={add} className="pd-add">
@@ -811,14 +820,8 @@ export default function ProductDetail() {
           <div className="pd-tab-head">
             {[
               { id: 'desc', label: 'বিবরণ' },
-              {
-                id: 'video',
-                label: `ভিডিও${videos.length ? ` (${toBn(videos.length)})` : ''}`,
-              },
-              {
-                id: 'reviews',
-                label: `রিভিউ (${toBn(reviewCount)})`,
-              },
+              { id: 'video', label: `ভিডিও${videos.length ? ` (${toBn(videos.length)})` : ''}` },
+              ...(layout.showReviews ? [{ id: 'reviews', label: `রিভিউ (${toBn(reviewCount)})` }] : []),
             ].map((t) => (
               <button
                 type="button"
@@ -916,7 +919,7 @@ export default function ProductDetail() {
             )}
 
             {/* ---------- রিভিউ ---------- */}
-            {tab === 'reviews' && (
+            {layout.showReviews && tab === 'reviews' && (
               <div>
                 {/* সারসংক্ষেপ */}
                 <div className="pd-rev-sum">
@@ -1043,7 +1046,7 @@ export default function ProductDetail() {
         </div>
 
         {/* ---------- সম্পর্কিত পণ্য ---------- */}
-        {related.length > 0 && (
+        {layout.showRelated && related.length > 0 && (
           <section style={{ marginTop: 18 }}>
             <div className="pd-related-head">
               <h2>সম্পর্কিত পণ্য</h2>
@@ -1060,7 +1063,7 @@ export default function ProductDetail() {
       </div>
 
       {/* ---------- মোবাইল স্টিকি বার ---------- */}
-      <div className="pd-sticky">
+      {layout.stickyBar && <div className="pd-sticky">
         <div className="pd-sticky-price">
           <b>{money(product.price)}</b>
 
@@ -1077,7 +1080,7 @@ export default function ProductDetail() {
         <button type="button" onClick={buyNow} className="pd-sticky-buy">
           কিনুন
         </button>
-      </div>
+      </div>}
 
       {/* ---------- জুম মোডাল ---------- */}
       {zoom && images[activeImg] && (

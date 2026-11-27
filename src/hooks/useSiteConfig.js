@@ -28,9 +28,9 @@ export const SITE_ROW_KEY = 'site';
 
 export const DEFAULT_NAV = [
   { id: 'n1', label: 'হোম', to: '/', end: true },
-  { id: 'n2', label: 'ফ্ল্যাশ সেল', to: '/products?sort=flash', hot: true },
-  { id: 'n3', label: 'সব পণ্য', to: '/products' },
-  { id: 'n4', label: 'রাইডিং গিয়ার', to: '/products?category=riding-gear' },
+  { id: 'n2', label: 'ফ্ল্যাশ সেল', to: '/shop?sort=flash', hot: true },
+  { id: 'n3', label: 'সব পণ্য', to: '/shop' },
+  { id: 'n4', label: 'রাইডিং গিয়ার', to: '/shop?category=riding-gear' },
   { id: 'n5', label: 'অর্ডার ট্র্যাকিং', to: '/track' },
 ];
 
@@ -151,7 +151,7 @@ export const DEFAULT_SITE = {
 
   /* ---- checkout / payment ---- */
   checkout: {
-    deliveryCharge: 100,
+    deliveryCharge: 80,
     outsideDeliveryCharge: 130,
     freeDeliveryAbove: 2000,
     codEnabled: true,
@@ -172,12 +172,25 @@ export const DEFAULT_SITE = {
     slides: DEFAULT_SLIDES,
     banners: DEFAULT_BANNERS,
     services: DEFAULT_SERVICES,
+    sectionLayout: [
+      { id: 'hero', type: 'hero', enabled: true, title: '', subtitle: '', backgroundColor: '', backgroundImage: '', overlay: 0, padding: '0' },
+      { id: 'perks', type: 'perks', enabled: true, title: '', subtitle: '', backgroundColor: '', backgroundImage: '', overlay: 0, padding: '40px 0' },
+      { id: 'categories', type: 'categories', enabled: true, title: 'ক্যাটাগরি', subtitle: 'আপনার পছন্দের ক্যাটাগরি বেছে নিন', backgroundColor: '', backgroundImage: '', overlay: 0, padding: '32px 0' },
+      { id: 'featured', type: 'featured', enabled: true, title: 'ফিচার্ড পণ্য', subtitle: 'আমাদের বাছাই করা সেরা পণ্য', backgroundColor: '', backgroundImage: '', overlay: 0, padding: '32px 0' },
+      { id: 'banners', type: 'banners', enabled: true, title: '', subtitle: '', backgroundColor: '', backgroundImage: '', overlay: 0, padding: '32px 0' },
+      { id: 'services', type: 'services', enabled: true, title: 'আমাদের সার্ভিস', subtitle: 'কেনার পরেও আমরা পাশে আছি', backgroundColor: '', backgroundImage: '', overlay: 0, padding: '32px 0' },
+      { id: 'latest', type: 'latest', enabled: true, title: 'নতুন এসেছে', subtitle: 'সদ্য যোগ হওয়া পণ্য', backgroundColor: '', backgroundImage: '', overlay: 0, padding: '32px 0' },
+      { id: 'newsletter', type: 'newsletter', enabled: true, title: '', subtitle: '', backgroundColor: '', backgroundImage: '', overlay: 0, padding: '32px 0' },
+    ],
     newsletter: {
       title: 'নিউজলেটার সাবস্ক্রাইব করুন',
       text: 'সর্বশেষ অফার ও নতুন পণ্য সম্পর্কে জানতে আপনার ইমেইল দিন।',
       button: 'সাবস্ক্রাইব',
     },
   },
+
+  /* ---- site-wide background ---- */
+  background: { type: 'color', color: '#08080a', image: '', overlay: 45, blur: 0 },
 
   /* ---- footer ---- */
   footerLinks: DEFAULT_FOOTER_LINKS,
@@ -188,6 +201,23 @@ export const DEFAULT_SITE = {
   /* ---- seo ---- */
   seo: DEFAULT_SEO,
   ogImage: '',
+  seo_advanced: {
+    siteUrl: 'https://impotech.sellsull.com',
+    siteName: STORE_INFO.name,
+    defaultTitle: 'ইম্পোটেক — প্রিমিয়াম বাইক অ্যাকসেসরিজ',
+    defaultDescription: 'চায়না থেকে সরাসরি আমদানি করা প্রিমিয়াম বাইক অ্যাকসেসরিজ, LED লাইট ও রাইডিং গিয়ার।',
+    defaultImage: '',
+    robotsIndex: true,
+    robotsFollow: true,
+    sitemapIncludeProducts: true,
+    sitemapIncludeCategories: true,
+    sitemapIncludePages: true,
+    sitemapIncludeLanding: true,
+    structuredData: true,
+    canonicalBase: 'https://impotech.sellsull.com',
+    twitterHandle: '',
+    facebookAppId: '',
+  },
 
   /* ---- admin ---- */
   admin: {
@@ -418,6 +448,23 @@ export const useSiteConfig = () => {
     return () => {
       alive = false;
     };
+  }, []);
+
+  /* Live refresh when the separate Admin app changes site_settings. */
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return undefined;
+    const channel = supabase
+      .channel('impotech-site-settings-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: SITE_TABLE }, async () => {
+        const remote = await fetchRemoteSiteConfig();
+        if (!remote) return;
+        const next = { ...remote, admin: readSiteConfig().admin };
+        writeSiteConfig(next);
+        setConfig(next);
+        setRemoteStatus('synced');
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   /** save(patch) merges a partial update; save(fn) gets the current config.

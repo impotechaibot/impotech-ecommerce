@@ -173,6 +173,27 @@ export function StoreProvider({ children }) {
     loadAll();
   }, [loadAll]);
 
+  // Separate Admin project publishes site_settings updates; refresh the shared
+  // settings map so checkout/header data updates without a page reload.
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return undefined;
+    const channel = supabase
+      .channel('impotech-store-settings-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_settings' }, async () => {
+        try {
+          const { data, error } = await supabase.from('site_settings').select('*');
+          if (error) throw error;
+          const map = {};
+          (data || []).forEach((row) => { map[row.key] = row.value; });
+          setSettings(map);
+        } catch (err) {
+          console.warn('[store] site settings live refresh failed:', err?.message || err);
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
   /* ---------- কার্ট ---------- */
 
   const addToCart = useCallback((product, qty = 1, variant = '') => {

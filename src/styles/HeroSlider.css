@@ -201,3 +201,19 @@
     font-size: 28px;
   }
 }
+
+/* Admin-controlled hero height with mobile override */
+.hero-slider {
+  height: var(--hero-height-desktop, 520px);
+}
+@media (max-width: 640px) {
+  .hero-slider {
+    height: var(--hero-height-mobile, 400px);
+  min-height: 260px;
+  max-height: 72vh;
+  min-height: min(var(--hero-height-mobile, 400px), 72vh);
+  max-height: none;
+  height: min(var(--hero-height-mobile, 400px), 72vh);
+  padding: 0;
+  }
+}

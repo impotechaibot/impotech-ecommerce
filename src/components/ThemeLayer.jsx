@@ -1,54 +1,28 @@
 import { useEffect } from 'react';
 import { useSiteConfig, hexToRgb, darken } from '../hooks/useSiteConfig.js';
 
-/* ==========================================================
-   ThemeLayer — applies the admin-chosen theme (accent colour,
-   font scale, corner radius, dark/light mode) as CSS variables
-   on :root. The background feature (useBackground) is untouched;
-   this only overrides the accent + a few sizing tokens.
-
-   v21 — অপরিবর্তিত (v20-এর ফিক্সই ঠিক আছে)।
-   ----------------------------------------------------------
-   আগে এই কম্পোনেন্টটা `useLocation()` দিয়ে রুট বদলালে
-   re-render হতো, কিন্তু `useSiteConfig()`-এর `config` স্টেট
-   আপডেট হতো না — কারণ `save()` যে `SITE_EVENT` ছড়ায় সেটা
-   শোনা হতো না। ফলে অ্যাডমিনে সেভ করলে localStorage-এ লেখা
-   হতো, কিন্তু ওয়েবসাইটের এই কম্পোনেন্ট re-render না হওয়ায়
-   CSS ভেরিয়েবলগুলো পুরোনো মানেই থেকে যেত।
-
-   এখন `useSiteConfig()` নিজেই SITE_EVENT শোনে (দেখুন
-   src/hooks/useSiteConfig.js), তাই config বদলালে এই
-   useEffect আবার চলে এবং ভেরিয়েবল সাথে সাথে বসে।
-
-   ⚠️ এই ফাইলে আর `useLocation` import করা হয়নি — কারণ
-   ThemeLayer এখন App.jsx-এর বাইরে main.jsx-এ মাউন্ট হয়,
-   যেখানে Router context নেই। useLocation রাখলে
-   "useLocation() may be used only in the context of a
-   <Router>" এরর হতো।
-   ========================================================== */
-
+/** Applies shared theme, typography, radius, and global background from Supabase. */
 const ThemeLayer = () => {
   const { config: site } = useSiteConfig();
   const theme = site.theme || {};
+  const background = site.background || {};
 
   useEffect(() => {
     const root = document.documentElement;
+    const body = document.body;
     const accent = theme.accent || '#f0b429';
-
+    if (site.favicon) {
+      let favicon = document.querySelector('link[rel=\"icon\"]');
+      if (!favicon) { favicon = document.createElement('link'); favicon.rel = 'icon'; document.head.appendChild(favicon); }
+      favicon.href = site.favicon;
+    }
     root.style.setProperty('--accent', accent);
     root.style.setProperty('--accent-dark', theme.accentDark || darken(accent, 0.2));
     root.style.setProperty('--accent-soft', `rgba(${hexToRgb(accent)}, 0.14)`);
     root.style.setProperty('--radius', `${theme.radius ?? 18}px`);
-    root.style.setProperty(
-      '--radius-sm',
-      `${Math.max(6, Math.round((theme.radius ?? 18) * 0.66))}px`
-    );
+    root.style.setProperty('--radius-sm', `${Math.max(6, Math.round((theme.radius ?? 18) * 0.66))}px`);
+    root.style.fontSize = `${((Number(theme.fontScale) || 100) / 100) * 16}px`;
 
-    // Font scale — 100 = default. Applied to the root font size.
-    const scale = Number(theme.fontScale) || 100;
-    root.style.fontSize = `${(scale / 100) * 16}px`;
-
-    // Dark / light mode — light mode flips the surface + text tokens.
     if (theme.mode === 'light') {
       root.style.setProperty('--bg', '#f4f4f6');
       root.style.setProperty('--surface', 'rgba(255, 255, 255, 0.92)');
@@ -70,7 +44,22 @@ const ThemeLayer = () => {
       root.style.setProperty('--muted', '#9a9aa4');
       root.style.setProperty('--muted-2', '#6e6e78');
     }
-  }, [theme.accent, theme.accentDark, theme.radius, theme.fontScale, theme.mode]);
+
+    if (background.type === 'image' && background.image) {
+      const alpha = Math.min(1, Math.max(0, Number(background.overlay || 0) / 100));
+      body.style.backgroundColor = background.color || 'var(--bg)';
+      body.style.backgroundImage = `linear-gradient(rgba(0,0,0,${alpha}),rgba(0,0,0,${alpha})),url("${background.image.replace(/"/g, '\\"')}")`;
+      body.style.backgroundSize = 'cover';
+      body.style.backgroundPosition = 'center';
+      body.style.backgroundAttachment = 'fixed';
+    } else {
+      body.style.backgroundImage = 'none';
+      body.style.backgroundColor = background.color || 'var(--bg)';
+      body.style.backgroundSize = '';
+      body.style.backgroundPosition = '';
+      body.style.backgroundAttachment = '';
+    }
+  }, [theme.accent, theme.accentDark, theme.radius, theme.fontScale, theme.mode, background.type, background.color, background.image, background.overlay, site.favicon]);
 
   return null;
 };

@@ -4,6 +4,7 @@ import {
   Search, ShoppingCart, Heart, User, Menu, X, Phone, Truck,
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext.jsx';
+import { useSiteConfig } from '../hooks/useSiteConfig.js';
 
 const NAV = [
   { to: '/', label: 'হোম', end: true },
@@ -15,12 +16,18 @@ const NAV = [
 ];
 
 export default function Header() {
-  const { cartCount, wishlist, settings } = useStore();
+  const { cartCount, wishlist } = useStore();
+  const { config: settings } = useSiteConfig();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const navigate = useNavigate();
   const contact = settings?.contact || {};
-  const identity = settings?.identity || {};
+  const identity = settings || {};
+  const navItems = (Array.isArray(settings?.nav) ? settings.nav : NAV).filter((item) => item.enabled !== false);
+  const headerSettings = { sticky: true, showTopBar: true, showSearch: true, showMenu: true, navAlignment: 'right', ...(settings?.headerSettings || {}) };
+  const freeDeliveryAbove = Number(settings?.checkout?.freeDeliveryAbove ?? 2000);
+  const siteLogo = identity.logo || settings?.logo || '';
+  const siteName = identity.siteName || 'ইম্পোটেক';
 
   const search = (e) => {
     e.preventDefault();
@@ -29,31 +36,27 @@ export default function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-bg/95 backdrop-blur border-b border-line">
+    <header className={`${headerSettings.sticky ? 'sticky top-0' : 'relative'} z-40 bg-bg/95 backdrop-blur border-b border-line`}>
       {/* টপ বার */}
-      <div className="bg-surface2 border-b border-line text-xs">
+      {headerSettings.showTopBar && <div className="bg-surface2 border-b border-line text-xs">
         <div className="container-x flex items-center justify-between h-9">
           <p className="flex items-center gap-1.5 text-ink-muted">
-            <Truck size={13} className="text-accent" /> ২০০০ টাকার উপরে ফ্রি ডেলিভারি
+            <Truck size={13} className="text-accent" /> {freeDeliveryAbove > 0 ? `${freeDeliveryAbove.toLocaleString('bn-BD')} টাকার উপরে ফ্রি ডেলিভারি` : 'ডেলিভারি চার্জ প্রযোজ্য'}
           </p>
           <a href={`tel:${contact.phone || ''}`} className="flex items-center gap-1.5 text-ink-muted hover:text-accent">
             <Phone size={13} /> {contact.phone || '01884332067'}
           </a>
         </div>
-      </div>
+      </div>}
 
       {/* মূল হেডার */}
       <div className="container-x flex items-center gap-4 h-16">
         <Link to="/" className="flex items-center gap-2 shrink-0">
-          <span className="w-9 h-9 rounded-lg bg-accent grid place-items-center text-black font-bold text-lg">
-            ই
-          </span>
-          <span className="font-semibold text-lg hidden sm:block">
-            {identity.siteName || 'ইম্পোটেক'}
-          </span>
+          {siteLogo ? <img src={siteLogo} alt={siteName} className="w-9 h-9 object-contain rounded-lg"/> : <span className="w-9 h-9 rounded-lg bg-accent grid place-items-center text-black font-bold text-lg">ই</span>}
+          <span className="font-semibold text-lg hidden sm:block">{siteName}</span>
         </Link>
 
-        <form onSubmit={search} className="hidden md:flex flex-1 max-w-md relative">
+        <form onSubmit={search} className={`${headerSettings.showSearch ? 'hidden md:flex' : 'hidden'} flex-1 max-w-md relative`}>
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
           <input
             className="input pl-9"
@@ -63,19 +66,12 @@ export default function Header() {
           />
         </form>
 
-        <nav className="hidden lg:flex items-center gap-1 ml-auto">
-          {NAV.map((n) => (
-            <NavLink
-              key={n.to}
-              to={n.to}
-              end={n.end}
-              className={({ isActive }) =>
-                `px-3 py-2 rounded-field text-sm transition-colors ${
-                  isActive ? 'text-accent font-medium' : 'text-ink-muted hover:text-ink'
-                }`
-              }
-            >
-              {n.label}
+        <nav className={`${headerSettings.showMenu ? 'hidden lg:flex' : 'hidden'} items-center gap-1 ${headerSettings.navAlignment === 'center' ? 'mx-auto' : 'ml-auto'}`}>
+          {navItems.map((n, index) => /^https?:\/\//i.test(n.to || '') ? (
+            <a key={n.id || n.to || index} href={n.to} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-field text-sm text-ink-muted hover:text-ink transition-colors">{n.label}{n.hot && <span className="ml-1 text-[9px] font-bold text-red-500 uppercase">Hot</span>}</a>
+          ) : (
+            <NavLink key={n.id || n.to || index} to={n.to || '/'} end={n.end} className={({ isActive }) => `px-3 py-2 rounded-field text-sm transition-colors ${isActive ? 'text-accent font-medium' : 'text-ink-muted hover:text-ink'}`}>
+              {n.label}{n.hot && <span className="ml-1 text-[9px] font-bold text-red-500 uppercase">Hot</span>}
             </NavLink>
           ))}
         </nav>
@@ -101,7 +97,7 @@ export default function Header() {
             <User size={19} />
           </Link>
           <button
-            className="lg:hidden w-10 h-10 grid place-items-center rounded-field text-ink-muted hover:text-ink"
+            className={`${headerSettings.showMenu ? 'lg:hidden' : 'hidden'} w-10 h-10 grid place-items-center rounded-field text-ink-muted hover:text-ink`}
             onClick={() => setOpen((v) => !v)}
             aria-label="মেনু"
           >
@@ -111,10 +107,10 @@ export default function Header() {
       </div>
 
       {/* মোবাইল মেনু */}
-      {open && (
+      {open && headerSettings.showMenu && (
         <div className="lg:hidden border-t border-line bg-surface">
           <div className="container-x py-3 space-y-1">
-            <form onSubmit={search} className="relative mb-2">
+            {headerSettings.showSearch && <form onSubmit={search} className="relative mb-2">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
               <input
                 className="input pl-9"
@@ -122,20 +118,12 @@ export default function Header() {
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
               />
-            </form>
-            {NAV.map((n) => (
-              <NavLink
-                key={n.to}
-                to={n.to}
-                end={n.end}
-                onClick={() => setOpen(false)}
-                className={({ isActive }) =>
-                  `block px-3 py-2.5 rounded-field text-sm ${
-                    isActive ? 'bg-accent/15 text-accent font-medium' : 'text-ink-muted hover:bg-surface2'
-                  }`
-                }
-              >
-                {n.label}
+            </form>}
+            {navItems.map((n, index) => /^https?:\/\//i.test(n.to || '') ? (
+              <a key={n.id || n.to || index} href={n.to} target="_blank" rel="noreferrer" onClick={() => setOpen(false)} className="block px-3 py-2.5 rounded-field text-sm text-ink-muted hover:bg-surface2">{n.label}{n.hot && <span className="ml-1 text-[9px] font-bold text-red-500 uppercase">Hot</span>}</a>
+            ) : (
+              <NavLink key={n.id || n.to || index} to={n.to || '/'} end={n.end} onClick={() => setOpen(false)} className={({ isActive }) => `block px-3 py-2.5 rounded-field text-sm ${isActive ? 'bg-accent/15 text-accent font-medium' : 'text-ink-muted hover:bg-surface2'}`}>
+                {n.label}{n.hot && <span className="ml-1 text-[9px] font-bold text-red-500 uppercase">Hot</span>}
               </NavLink>
             ))}
           </div>

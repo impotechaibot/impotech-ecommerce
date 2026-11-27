@@ -21,6 +21,8 @@ import Contact from './pages/Contact.jsx';
 import LandingPage from './pages/LandingPage.jsx';
 import NotFound from './pages/NotFound.jsx';
 import Admin from './pages/Admin.jsx';
+import CustomPage from './pages/CustomPage.jsx';
+import ContentPage from './pages/ContentPage.jsx';
 import './styles/CheckoutTheme.css';
 
 /** রুট বদলালে উপরে স্ক্রল */
@@ -62,6 +64,8 @@ export default function App() {
           <Route path="/policy/:slug" element={<Policy />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/lp/:slug" element={<LandingPage />} />
+          <Route path="/page/:slug" element={<CustomPage />} />
+          <Route path="/content/:slug" element={<ContentPage />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
